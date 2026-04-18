@@ -139,9 +139,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
     </div>
     <div class="chips">
       <span class="chip ok">Realtime Database</span>
-      <span class="chip">匿名認証</span>
+      <span class="chip">身内モード</span>
       <span class="chip">自作役判定</span>
       <span class="chip">サイドポット対応</span>
+      <span id="hintToggle" class="chip ok" style="cursor:pointer;user-select:none" title="日本語ガイド表示を切り替えます（ブラウザに保存・プレイヤー個別）">💡 ガイド: ON</span>
       <span id="authChip" class="chip ok">身内モード</span>
     </div>
   </div>
@@ -256,11 +257,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <div class="seats" id="seatsEl"></div>
       </div>
 
+      <!-- 全員向けガイド：現在誰の番か、何ができるか -->
+      <div id="tableHint" class="tableHint" style="display:none;background:linear-gradient(135deg,#1a3b6e,#2b66b8);color:#fff;padding:10px 12px;border-radius:10px;margin-top:10px;line-height:1.5;font-size:13px"></div>
+
       <div class="handArea">
         <div id="turnBanner" style="display:none;background:linear-gradient(135deg,#1f8e52,#3ed27a);color:#fff;padding:8px 12px;border-radius:10px;font-weight:700;margin-bottom:8px;text-align:center">★ あなたの番です ★</div>
         <h4>あなたの手札 <span id="myHandRank" class="handBadge hidden"></span></h4>
         <div class="handCards" id="myHandEl"></div>
         <div class="actions" id="actionsEl"></div>
+        <div id="actionGuide" style="display:none;margin-top:8px;background:#0b1328;border:1px dashed #35527b;border-radius:10px;padding:8px;font-size:12px;color:#cfe1ff;line-height:1.55"></div>
       </div>
     </section>
 
@@ -345,7 +350,15 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const fdb = firebase.database();
 
-const STORAGE = { name:"poker.name", roomId:"poker.roomId", uid:"poker.uid" };
+const STORAGE = { name:"poker.name", roomId:"poker.roomId", uid:"poker.uid", hints:"poker.showHints" };
+// ガイド表示のON/OFF（プレイヤー個別に localStorage 保存）
+function getShowHints(){
+  const v = localStorage.getItem(STORAGE.hints);
+  return v === null ? true : (v === "1");
+}
+function setShowHints(b){
+  localStorage.setItem(STORAGE.hints, b?"1":"0");
+}
 
 // 身内用：匿名認証を使わず、ブラウザの localStorage にランダムuidを保存して利用
 function getOrCreateLocalUid(){
@@ -414,6 +427,24 @@ function init(){
 
   // 身内モード：ローカルuidを使う（匿名認証不要）
   state.uid = getOrCreateLocalUid();
+
+  // 日本語ガイドのON/OFFトグル
+  const hintToggle = document.getElementById("hintToggle");
+  if(hintToggle){
+    const refreshHintChip = ()=>{
+      const on = getShowHints();
+      hintToggle.textContent = on ? "💡 ガイド: ON" : "💤 ガイド: OFF";
+      hintToggle.classList.toggle("ok", on);
+      hintToggle.classList.toggle("warn", !on);
+    };
+    refreshHintChip();
+    hintToggle.onclick = ()=>{
+      setShowHints(!getShowHints());
+      refreshHintChip();
+      renderAll();
+      toast(getShowHints()?"日本語ガイドをONにしました":"日本語ガイドをOFFにしました");
+    };
+  }
   const lastRoom = localStorage.getItem(STORAGE.roomId);
   if(lastRoom && !state.roomId){
     document.getElementById("roomId").value = lastRoom;
@@ -1385,8 +1416,95 @@ async function appendLog(id, text){
  * ========================= */
 function renderAll(){
   renderHeader(); renderBoard(state.room?.board||[]); renderSeats(); renderMyHand(); renderActions();
+  renderTableHint(); renderActionGuide();
   renderLogs(); renderButtons();
   renderModal();
+}
+
+/* =========================
+ * 全員向けテーブルガイド（誰の番か、何が起きているか）
+ * ========================= */
+function renderTableHint(){
+  const el=document.getElementById("tableHint");
+  if(!el) return;
+  const r=state.room;
+  const me = state.players[state.uid];
+  if(!getShowHints()){ el.style.display="none"; return; }
+  if(!r){
+    el.style.display="block";
+    el.innerHTML = `🔍 <b>ルーム未参加</b> — 左の「ルーム作成」で新規作成してホストになるか、渡されたRoomIDを「参加」で入力してください。`;
+    return;
+  }
+  if(r.status==="waiting" && r.stage!=="ended"){
+    el.style.display="block";
+    const canStart = r.hostUid===state.uid && Object.values(state.players).filter(p=>p.stack>0).length>=2;
+    el.innerHTML = `⏳ <b>待機中</b> — ホストが「ゲーム開始」を押すと次のハンドが始まります。${canStart?"<br>👉 <b>あなたはホストです。</b>「ゲーム開始」ボタンを押してください。":""}`;
+    return;
+  }
+  if(r.stage==="ended"){
+    el.style.display="block";
+    el.innerHTML = `🏁 <b>ハンド結果表示中</b> — 画面中央の結果モーダルのOKを押すと閉じます。ホストは「ゲーム開始」で次のハンドを始められます。`;
+    return;
+  }
+  if(r.status==="playing"){
+    const turnSeat = r.turnSeat;
+    const turnP = Object.values(state.players).find(p=>p.seat===turnSeat);
+    const stage = stageLabel(r.stage);
+    let msg = `🃏 <b>現在：${stage}</b>＼ポット <b>${r.pot||0}</b>`;
+    if(r.currentBet>0) msg += ` ＼ コール額 <b>${r.currentBet}</b>`;
+    if(turnP){
+      const isMe = turnP.uid===state.uid;
+      const toCall = Math.max(0,(r.currentBet||0)-(turnP.bet||0));
+      if(r.variant==="draw5" && r.stage==="draw"){
+        msg += `<br>➡️ <b>${escapeHtml(turnP.name)}${isMe?"（あなた）":""}</b> のドロー判断中（手札を0～5枚交換）`;
+      } else {
+        msg += `<br>➡️ <b>${escapeHtml(turnP.name)}${isMe?"（あなた）":""}</b> の番です`;
+        if(toCall===0) msg += ` — チェックまたはベットできます`;
+        else           msg += ` — コールには <b>${toCall}</b> 必要（レイズ/フォールも可）`;
+      }
+    }
+    if(me && me.folded) msg += `<br>🛑 <b>あなたはこのハンドをフォールド済み</b>です。観戦モードで次のハンドをお待ちください。`;
+    else if(me && me.allIn) msg += `<br>💰 <b>あなたはオールイン済み</b>。残りのベットには参加しませんが、ショーダウンに進みます。`;
+    else if(me && !turnP) msg += `<br>⌛ 次の番手を決定中…`;
+    else if(me && turnP && turnP.uid!==state.uid) msg += `<br>👀 その間に作戦を見直しましょう。`;
+    el.style.display="block";
+    el.innerHTML = msg;
+  } else {
+    el.style.display="none";
+  }
+}
+
+/* 自分の番になったときの行動ガイド（全プレイヤーに表示される） */
+function renderActionGuide(){
+  const el=document.getElementById("actionGuide");
+  if(!el) return;
+  if(!getShowHints()){ el.style.display="none"; return; }
+  const r=state.room; const me=state.players[state.uid];
+  if(!r || !me || r.status!=="playing" || me.folded || r.turnSeat!==me.seat){
+    el.style.display="none"; return;
+  }
+  if(r.variant==="draw5" && r.stage==="draw"){
+    el.style.display="block";
+    el.innerHTML = `
+      <b>🎴 ドローのやり方</b><br>
+      ① 手札のカードをクリック/タップすると『✓ 交換』マークが付きます（再タップで解除）。<br>
+      ② 「交換して確定」を押すと、選んだ枚数だけ新しいカードに差し替わります。<b>0枚で確定（スタンドパット）</b>も可能。<br>
+      ③ 全員のドローが終わったら、最後のベットラウンド→ショーダウンへ進みます。`;
+    return;
+  }
+  const toCall = Math.max(0,(r.currentBet||0)-(me.bet||0));
+  const items = [];
+  items.push(`<b>🚩 フォールド（降りる）</b>：このハンドを放棄。これまでのベットは戻りませんが、これ以上の损失を防げます。`);
+  if(toCall===0){
+    items.push(`<b>✓ チェック（見送り）</b>：賜けずに番を回します。現在ベットが0のときだけ選べます。`);
+  } else {
+    items.push(`<b>💵 コール（${Math.min(toCall,me.stack)}支払う）</b>：相手のベットに乗って次のステージへ進みます。`);
+  }
+  items.push(`<b>↑ ${r.currentBet>0?"レイズ":"ベット"}</b>：ベット額を決めて相手にプレッシャーをかけます。${r.betting==="limit"?"リミット制：額は固定。":(r.betting==="potlimit"?"ポットリミット制：ポット額まで。":"ノーリミット制：上限なし。")}`);
+  items.push(`<b>🔥 オールイン</b>：持ちチップ全額を賜けます。負ければレース脱落、勝てば大きく増やせます。`);
+  el.style.display="block";
+  el.innerHTML = `<div style="font-weight:700;color:#ffdf9a;margin-bottom:6px">★ あなたの番の選択肢</div>` +
+    items.map(x=>`<div style="margin-bottom:4px">${x}</div>`).join("");
 }
 function renderHeader(){
   const r=state.room;
@@ -1472,8 +1590,10 @@ function renderMyHand(){
     // ガイドラベルを追加表示
     const guide = document.createElement("div");
     guide.style.cssText = "width:100%;font-size:12px;color:#ffdf9a;margin-top:6px";
-    guide.textContent = `交換したいカードをタップ/クリックして選択（選択中: ${selected.size}枚） → 下の「交換して確定」を押す。交換なしも可。`;
-    el.appendChild(guide);
+    if(getShowHints()){
+      guide.textContent = `交換したいカードをタップ/クリックして選択（選択中: ${selected.size}枚） → 下の「交換して確定」を押す。交換なしも可。`;
+      el.appendChild(guide);
+    }
     el.querySelectorAll(".card[data-idx]").forEach(node=>{
       node.style.cursor = "pointer";
       node.addEventListener("click", (ev)=>{
@@ -1511,8 +1631,8 @@ function renderActions(){
   if(banner) banner.style.display="none";
   if(!r||!me) return;
   if(r.status!=="playing") return;
-  // 「自分の番」バナー
-  if(banner && r.turnSeat===me.seat && !me.folded){
+  // 「自分の番」バナー（ガイドONのときのみ）
+  if(banner && r.turnSeat===me.seat && !me.folded && getShowHints()){
     banner.style.display="block";
     if(r.variant==="draw5" && r.stage==="draw"){
       banner.textContent = "★ あなたのドロー番です — 交換したいカードを選ぶか、交換なしで確定してください";
@@ -1549,7 +1669,7 @@ function renderActions(){
   }
   const toCall=Math.max(0,(r.currentBet||0)-(me.bet||0));
   // fold
-  const foldBtn=document.createElement("button"); foldBtn.className="btnDanger"; foldBtn.textContent="フォールド（彃ける）"; foldBtn.title="このハンドを放棄します。これまでの賭け金は戻りませんが、これ以上の損失は回避できます。"; foldBtn.onclick=()=>apiAction("fold"); el.appendChild(foldBtn);
+  const foldBtn=document.createElement("button"); foldBtn.className="btnDanger"; foldBtn.textContent="フォールド（降りる）"; foldBtn.title="このハンドを放棄します。これまでの賭け金は戻りませんが、これ以上の損失は回避できます。"; foldBtn.onclick=()=>apiAction("fold"); el.appendChild(foldBtn);
   if(toCall===0){
     const chk=document.createElement("button"); chk.className="btnDark"; chk.textContent="チェック（何もしない）"; chk.title="賭けずに次の人へ回します。ベットが0の時だけ可能。"; chk.onclick=()=>apiAction("check"); el.appendChild(chk);
   } else {
@@ -1616,49 +1736,78 @@ function renderButtons(){
 
 /* =========================
  * ショーダウン結果モーダル
- * ========================= */
-// モーダル状態管理：ハンドの handNo ごとに「表示済みかつユーザーがOKを押した」を記録
-let _modalShownForHand=-1;     // 表示済みの handNo
+ * ========================= *
+ * ■ 設計：OKを押すまで絶対に閉じない
+ *   - 結果（winnersLog）を1ハンドごとにスナップショットして保持し、
+ *     次のハンドでRTDBの winnersLog が上書きされても表示中のモーダルは影響を受けない。
+ *   - renderModal() 内で勝手にモーダルを消す条件を撤廃。
+ *     閉じるのは (A) OKボタン押下  (B) 次ハンド開始時に前回OK済み or 最初から未表示
+ *   - playersRef.set() → renderAll → renderModal の連鎖で消えないように、
+ *     表示用スナップショットは _modalSnapshot に保持する。
+ */
+let _modalShownForHand=-1;     // 表示中の handNo
 let _modalClosedForHand=-1;    // ユーザーが OK を押した handNo
+let _modalSnapshot=null;       // 表示中モーダル用のスナップショット
+
 function renderModal(){
   const root=document.getElementById("modalRoot");
   const r=state.room;
-  if(!r){ root.innerHTML=""; return; }
-  // 結果表示中でなければ何もしない
-  if(r.stage!=="ended"){
-    // 次のハンドが始まったら消す
-    if(r.status==="playing") root.innerHTML="";
-    return;
-  }
-  // すでにこのハンドで OK を押されていれば表示しない
-  if(_modalClosedForHand === r.handNo) return;
-  // すでに表示中ならDOMを保持して何もしない（変数状態の差分更新を防ぐ）
-  if(_modalShownForHand === r.handNo && root.querySelector(".modal")) return;
-  _modalShownForHand = r.handNo;
+  if(!r){ return; } // 念のため：部屋なしなら何もしない（消さない）
 
-  const wl=r.winnersLog||[];
+  // 新しい結果が来たら、スナップショットを取得
+  if(r.stage==="ended" && r.handNo != null){
+    if(_modalClosedForHand !== r.handNo){
+      // まだこのハンドの結果を閉じていない → スナップショットを更新（未取得 or 旧ハンド）
+      if(!_modalSnapshot || _modalSnapshot.handNo !== r.handNo){
+        _modalSnapshot = {
+          handNo: r.handNo,
+          board: (r.board||[]).slice(),
+          winnersLog: (r.winnersLog||[]).map(w=>({amount:w.amount, winners:(w.winners||[]).map(x=>({...x}))})),
+          publicHands: r.publicHands ? JSON.parse(JSON.stringify(r.publicHands)) : {},
+          evals: r.evals ? JSON.parse(JSON.stringify(r.evals)) : {},
+          playerNames: Object.fromEntries(Object.values(state.players).map(p=>[p.uid, p.name]))
+        };
+        _modalShownForHand = r.handNo;
+      }
+    }
+  }
+
+  // スナップショットがない、または既にOKされている → 何もしない（既存DOMに触れない）
+  if(!_modalSnapshot) return;
+  if(_modalClosedForHand === _modalSnapshot.handNo){ return; }
+
+  // すでに表示中ならDOMを保持（再描画しない＝ちらつき防止）
+  if(root.querySelector(".modal[data-hand='"+_modalSnapshot.handNo+"']")) return;
+
+  const snap = _modalSnapshot;
+  const wl = snap.winnersLog || [];
   const wlines = wl.map(p=>{
     const names=(p.winners||[]).map(w=>`${escapeHtml(w.name)}（${escapeHtml(w.rankName||"")}）`).join("、");
     return `<div class="winnerLine">ポット ${p.amount} → ${names}</div>`;
   }).join("");
-  const hands = (r.publicHands?Object.entries(r.publicHands):[]).map(([uid,h])=>{
-    const ev=(r.evals||{})[uid];
-    const name=escapeHtml(state.players[uid]?.name||uid);
+  const hands = Object.entries(snap.publicHands||{}).map(([uid,h])=>{
+    const ev=(snap.evals||{})[uid];
+    const name=escapeHtml(snap.playerNames[uid] || state.players[uid]?.name || uid);
     return `<div style="display:flex;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap"><b>${name}</b> <span class="handBadge">${escapeHtml(ev?.rankName||"")}</span> ${h.map(c=>cardHtml(c,{small:true})).join("")}</div>`;
   }).join("");
-  const boardHtml = (r.board&&r.board.length>0) ?
-    `<div style="margin:8px 0"><div style="font-size:12px;color:#8a94ab;margin-bottom:4px">共通カード</div><div style="display:flex;gap:4px;flex-wrap:wrap">${r.board.map(c=>cardHtml(c,{small:true})).join("")}</div></div>` : "";
-  root.innerHTML=`<div class="modal"><div class="box">
-    <h2>ハンド結果（第${r.handNo}ハンド）</h2>
+  const boardHtml = (snap.board && snap.board.length>0) ?
+    `<div style="margin:8px 0"><div style="font-size:12px;color:#8a94ab;margin-bottom:4px">共通カード</div><div style="display:flex;gap:4px;flex-wrap:wrap">${snap.board.map(c=>cardHtml(c,{small:true})).join("")}</div></div>` : "";
+  root.innerHTML=`<div class="modal" data-hand="${snap.handNo}"><div class="box">
+    <h2>ハンド結果（第${snap.handNo}ハンド）</h2>
     ${wlines||"<div class='winnerLine'>勝者なし</div>"}
     ${boardHtml}
     <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">${hands||'<div style="color:#8a94ab">公開ハンドなし（不戦勝）</div>'}</div>
+    <div style="font-size:11px;color:#8a94ab;margin-top:6px">※ OKボタンを押すまでこの結果画面は閉じません。</div>
     <div class="row"><button class="btnPrimary" id="mClose">OK（結果を閉じる）</button></div>
   </div></div>`;
-  document.getElementById("mClose").onclick=()=>{
-    _modalClosedForHand = r.handNo;
-    root.innerHTML="";
-  };
+  const closeBtn=document.getElementById("mClose");
+  if(closeBtn){
+    closeBtn.onclick=()=>{
+      _modalClosedForHand = snap.handNo;
+      _modalSnapshot = null;
+      root.innerHTML="";
+    };
+  }
 }
 </script>
 </body>
