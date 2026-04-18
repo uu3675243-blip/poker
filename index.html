@@ -141,7 +141,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <span class="chip">匿名認証</span>
       <span class="chip">自作役判定</span>
       <span class="chip">サイドポット対応</span>
-      <span id="authChip" class="chip warn">接続中…</span>
+      <span id="authChip" class="chip ok">身内モード</span>
     </div>
   </div>
 
@@ -168,21 +168,29 @@ button:disabled{opacity:.45;cursor:not-allowed}
           <div class="ttl">5カードドロー</div>
           <div class="desc">手札5枚。1回だけ任意の枚数を交換して役を作る。</div>
         </div>
+        <div class="opt" data-val="stud7">
+          <div class="ttl">7カードスタッド</div>
+          <div class="desc">7枚（表4枚＋裏3枚）を受け取り、最良の5枚で役を作る。アンティ＋ブリングイン方式、共通カードなし。</div>
+        </div>
       </div>
 
       <h3 style="margin-top:10px">③ 対戦形式（ベッティング）</h3>
       <div class="segment" id="bettingSeg">
-        <div class="opt sel" data-val="nolimit">
-          <div class="ttl">ノーリミット</div>
-          <div class="desc">賭け金上限なし。いつでもオールイン可能。</div>
+        <div class="opt sel" data-val="nolimit_cash">
+          <div class="ttl">ノーリミットHE（キャッシュ）</div>
+          <div class="desc">ノーリミット・テキサスホールデム キャッシュゲーム。ブラインド固定・上限なし。</div>
+        </div>
+        <div class="opt" data-val="nolimit_mtt">
+          <div class="ttl">ノーリミットHE（トーナメント）</div>
+          <div class="desc">ノーリミット・テキサスホールデム トーナメント。ブラインドが一定ハンドごとに上昇し、落伍者が出る形式。</div>
         </div>
         <div class="opt" data-val="limit">
-          <div class="ttl">リミット</div>
-          <div class="desc">ベット額は固定（前半=SB+BB、後半=BB×2）。</div>
+          <div class="ttl">リミットHE</div>
+          <div class="desc">リミット・テキサスホールデム。ベット額は固定（前半=BB、後半=BB×2）。</div>
         </div>
         <div class="opt" data-val="potlimit">
-          <div class="ttl">ポットリミット</div>
-          <div class="desc">現在のポット額までベット・レイズ可能。</div>
+          <div class="ttl">ポットリミットHE</div>
+          <div class="desc">ポットリミット・テキサスホールデム。現在のポット額までベット・レイズ可能。</div>
         </div>
       </div>
 
@@ -291,12 +299,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 <!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
 /* ========================================================================
- * Firebase 設定（別プロジェクト用に差し替えてください）
- * Firebase Console → プロジェクト設定 → マイアプリ(ウェブ) から値を取得
+ * Firebase 設定（身内用・poker-aae8f）— 匿名認証無し
  * ======================================================================== */
 const firebaseConfig = {
   apiKey: "AIzaSyCuZG7R_12MKUOSWsALk-eEVKcyQdm4lpo",
@@ -308,10 +314,19 @@ const firebaseConfig = {
   appId: "1:716709677662:web:2b13f739018f18698702cf"
 };
 firebase.initializeApp(firebaseConfig);
-const fauth = firebase.auth();
-const fdb   = firebase.database();
+const fdb = firebase.database();
 
-const STORAGE = { name:"poker.name", roomId:"poker.roomId" };
+const STORAGE = { name:"poker.name", roomId:"poker.roomId", uid:"poker.uid" };
+
+// 身内用：匿名認証を使わず、ブラウザの localStorage にランダムuidを保存して利用
+function getOrCreateLocalUid(){
+  let uid = localStorage.getItem(STORAGE.uid);
+  if(!uid){
+    uid = "u_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+    localStorage.setItem(STORAGE.uid, uid);
+  }
+  return uid;
+}
 const SUITS = ["s","h","d","c"];
 const SUIT_SYM = {s:"♠",h:"♥",d:"♦",c:"♣"};
 const RANKS = ["2","3","4","5","6","7","8","9","T","J","Q","K","A"];
@@ -324,7 +339,7 @@ const state = {
   roomId:null,
   playerName:"",
   variant:"holdem",
-  betting:"nolimit",
+  betting:"nolimit_cash",
   room:null,
   players:{},
   myHand:[],
@@ -368,24 +383,12 @@ function init(){
     };
   });
 
-  // 匿名ログイン
-  fauth.onAuthStateChanged(user=>{
-    if(user){
-      state.uid=user.uid;
-      const c=document.getElementById("authChip");
-      c.textContent="認証OK";
-      c.classList.remove("warn"); c.classList.add("ok");
-      // 自動で前回の部屋へ再接続
-      const lastRoom=localStorage.getItem(STORAGE.roomId);
-      if(lastRoom && !state.roomId){
-        document.getElementById("roomId").value=lastRoom;
-      }
-    }
-  });
-  fauth.signInAnonymously().catch(err=>{
-    toast("匿名認証に失敗: "+err.message);
-    const c=document.getElementById("authChip"); c.textContent="認証失敗"; c.classList.remove("ok"); c.classList.add("warn");
-  });
+  // 身内モード：ローカルuidを使う（匿名認証不要）
+  state.uid = getOrCreateLocalUid();
+  const lastRoom = localStorage.getItem(STORAGE.roomId);
+  if(lastRoom && !state.roomId){
+    document.getElementById("roomId").value = lastRoom;
+  }
 
   renderBoard([]); renderSeats(); renderMyHand(); renderActions();
 }
@@ -440,7 +443,7 @@ function parseBlinds(str){
 }
 
 async function apiCreateRoom(){
-  if(!state.uid){ toast("認証待ち。数秒後にもう一度お試しください"); return; }
+  if(!state.uid){ state.uid = getOrCreateLocalUid(); }
   const name=normalizeName(document.getElementById("playerName").value);
   if(!name){ toast("表示名を入力してください"); return; }
   localStorage.setItem(STORAGE.name,name);
@@ -474,7 +477,7 @@ async function apiCreateRoom(){
 }
 
 async function apiJoinRoom(){
-  if(!state.uid){ toast("認証待ち"); return; }
+  if(!state.uid){ state.uid = getOrCreateLocalUid(); }
   const name=normalizeName(document.getElementById("playerName").value);
   if(!name){ toast("表示名を入力してください"); return; }
   const id=(document.getElementById("roomId").value||"").trim().toUpperCase();
@@ -614,7 +617,8 @@ async function apiStartGame(){
   });
 
   // ハンド別カード数
-  const perPlayer = r.variant==="holdem"?2 : r.variant==="omaha"?4 : 5;
+  // 手札枚数：Holdem=2 / Omaha=4 / Draw5=5 / Stud7=7
+  const perPlayer = r.variant==="holdem"?2 : r.variant==="omaha"?4 : r.variant==="stud7"?7 : 5;
   // プライベートハンド（UID別に保存）
   const privateUpdates={};
   // ディーラー左隣から配布
@@ -648,23 +652,52 @@ async function apiStartGame(){
     firstActSeat = nextSeatFrom(bbSeat, activeSeats);
   }
   // 5カードドローの場合、ブラインド方式で同じく進行。ステージは draw-bet1
-  const stage = r.variant==="draw5" ? "predraw" : "preflop";
+  // ステージの初期値
+  //   Holdem/Omaha: preflop
+  //   Draw5: predraw
+  //   Stud7: stud1 (3枚表示相当の第1ベット)
+  const stage = r.variant==="draw5" ? "predraw" : r.variant==="stud7" ? "stud1" : "preflop";
+
+  // トーナメント形式（nolimit_mtt）のブラインド自動上昇
+  //   5ハンドごとに1.5倍（切り上げ）
+  let curSb = r.sb, curBb = r.bb;
+  if(r.betting==="nolimit_mtt"){
+    const level = Math.floor((handNo-1) / 5);
+    const mult = Math.pow(1.5, level);
+    curSb = Math.max(r.sb, Math.round((r.sb*mult)/5)*5 || r.sb);
+    curBb = Math.max(r.bb, Math.round((r.bb*mult)/10)*10 || r.bb);
+    if(curBb < curSb*2) curBb = curSb*2;
+  }
 
   // ブラインド徴収
   const sbP = playerUpdates[seatToUid[sbSeat]];
   const bbP = playerUpdates[seatToUid[bbSeat]];
-  const sbAmt = Math.min(r.sb, sbP.stack);
-  const bbAmt = Math.min(r.bb, bbP.stack);
+  const sbAmt = Math.min(curSb, sbP.stack);
+  const bbAmt = Math.min(curBb, bbP.stack);
   sbP.stack -= sbAmt; sbP.bet = sbAmt; sbP.totalBet = sbAmt; sbP.lastAction="SB"; if(sbP.stack===0) sbP.allIn=true;
   bbP.stack -= bbAmt; bbP.bet = bbAmt; bbP.totalBet = bbAmt; bbP.lastAction="BB"; if(bbP.stack===0) bbP.allIn=true;
 
+  // 7カードスタッドはアンティ方式のみ（簡易版）：全員から SB/2 アンティを徴収
+  let anteTotal = 0;
+  if(r.variant==="stud7"){
+    const ante = Math.max(1, Math.floor(curSb/2));
+    for(const p of Object.values(playerUpdates)){
+      if(!p.inHand) continue;
+      const a = Math.min(ante, p.stack);
+      p.stack -= a; p.totalBet += a; anteTotal += a;
+      if(p.stack===0) p.allIn=true;
+    }
+  }
+
   const roomUpdate = {
     status:"playing", stage, handNo, dealerSeat,
-    pot:0, currentBet:bbAmt, minRaise:r.bb,
+    pot:anteTotal, currentBet:bbAmt, minRaise:curBb,
     board:[], deck, lastAggressorSeat:bbSeat,
     turnSeat:firstActSeat, actionEndSeat:bbSeat,
     sbSeat, bbSeat,
+    curSb, curBb,
     lastAction:"", sidePots:[],
+    publicHands:null, evals:null, winnersLog:null,
     updatedAt: firebase.database.ServerValue.TIMESTAMP
   };
 
@@ -677,7 +710,9 @@ async function apiStartGame(){
   for(const uid of Object.keys(privateUpdates)){
     await fdb.ref("privateHands/"+id+"/"+uid).set(privateUpdates[uid]);
   }
-  await appendLog(id, `第${handNo}ハンド開始 / Dealer=席${dealerSeat+1} / SB=${sbAmt} / BB=${bbAmt}`);
+  const extra = r.variant==="stud7" ? ` / アンティ計${anteTotal}` : "";
+  const lvlInfo = r.betting==="nolimit_mtt" ? ` / レベル${Math.floor((handNo-1)/5)+1}(SB${curSb}/BB${curBb})` : "";
+  await appendLog(id, `第${handNo}ハンド開始 / Dealer=席${dealerSeat+1} / SB=${sbAmt} / BB=${bbAmt}${extra}${lvlInfo}`);
 }
 
 /* =========================
@@ -888,6 +923,30 @@ async function advanceIfNeeded(id){
     }
   }
 
+  // 7カードスタッドの進行（簡易版：全員に7枚配布済。ベットラウンド3回でショーダウン）
+  if(refreshed.variant==="stud7"){
+    const nextStud = {stud1:"stud2", stud2:"stud3", stud3:"showdown"}[refreshed.stage];
+    if(nextStud==="showdown"){
+      await showdown(id, refreshed, refreshedP);
+      return;
+    }
+    const seats2 = Object.values(refreshedP).filter(p=>p.inHand && !p.folded).map(p=>p.seat).sort((a,b)=>a-b);
+    if(seats2.filter(s=>{ const pp=Object.values(refreshedP).find(x=>x.seat===s); return pp && !pp.allIn; }).length<=1){
+      // 全員オールイン・フォールド→即ショーダウン
+      await roomRef(id).update({ stage:"stud3" });
+      const c2=(await roomRef(id).get()).val(); const p2=(await playersRef(id).get()).val()||{};
+      await showdown(id, c2, p2);
+      return;
+    }
+    const first = nextSeatFrom(refreshed.dealerSeat, seats2);
+    const updates={};
+    Object.values(refreshedP).forEach(p=>{ updates[p.uid]={...p, actedThisRound:false, lastAction:"", bet:0}; });
+    await playersRef(id).set(updates);
+    await roomRef(id).update({ stage:nextStud, turnSeat:first, actionEndSeat:prevSeatFromList(first, seats2), currentBet:0, minRaise:refreshed.bb, lastAggressorSeat:-1 });
+    await appendLog(id, `ステージ: ${stageLabel(nextStud)}`);
+    return;
+  }
+
   // ホールデム / オマハ
   const nextStage = {preflop:"flop", flop:"turn", turn:"river", river:"showdown"}[refreshed.stage];
   if(nextStage==="showdown"){
@@ -938,7 +997,8 @@ async function runToShowdown(id){
   const deck=[...(curr.deck||[])];
   // 残ステージを一気に
   let stage=curr.stage;
-  while(stage!=="river" && stage!=="showdown" && curr.variant!=="draw5"){
+  // Stud7 や Draw5 はボード配布なしなので、ここはホールデム/オマハのみ
+  while(stage!=="river" && stage!=="showdown" && curr.variant!=="draw5" && curr.variant!=="stud7"){
     if(deck.length>0) deck.shift();
     if(stage==="preflop"){ board.push(deck.shift(),deck.shift(),deck.shift()); stage="flop"; }
     else if(stage==="flop"){ board.push(deck.shift()); stage="turn"; }
@@ -1136,10 +1196,11 @@ function orderFromSeat(seats, fromSeat, skipDealer){
  *  - potlimit: 現ポット + 自分のbet + toCall を上限
  * ========================= */
 function computeMaxTotal(curr, me, players){
-  if(curr.betting==="nolimit") return null;
+  // ノーリミット（キャッシュ／トーナメント）は上限なし
+  if(curr.betting==="nolimit_cash" || curr.betting==="nolimit_mtt" || curr.betting==="nolimit") return null;
   if(curr.betting==="limit"){
-    const isSmallStreet = (curr.stage==="preflop"||curr.stage==="flop"||curr.stage==="predraw");
-    const size = isSmallStreet ? curr.bb : curr.bb*2;
+    const isSmallStreet = (curr.stage==="preflop"||curr.stage==="flop"||curr.stage==="predraw"||curr.stage==="stud1"||curr.stage==="stud2");
+    const size = isSmallStreet ? (curr.curBb||curr.bb) : (curr.curBb||curr.bb)*2;
     // 固定サイズ: total = currentBet + size
     return (curr.currentBet||0) + size;
   }
@@ -1195,6 +1256,9 @@ function evalBestHand(hand, board, variant){
     return best;
   } else if(variant==="draw5"){
     return evalFive(hand);
+  } else if(variant==="stud7"){
+    // 7枚の手札から最良5枚を選択
+    return best5From(hand);
   }
 }
 function best5From(cards){
@@ -1285,7 +1349,7 @@ function renderHeader(){
   document.getElementById("mRoom").textContent = state.roomId||"-";
   document.getElementById("mVariant").textContent = r?variantLabel(r.variant):"-";
   document.getElementById("mBetting").textContent = r?bettingLabel(r.betting):"-";
-  document.getElementById("mBlinds").textContent = r?`${r.sb}/${r.bb}`:"-";
+  document.getElementById("mBlinds").textContent = r ? ((r.curSb && r.curBb) ? `${r.curSb}/${r.curBb}` : `${r.sb}/${r.bb}`) : "-";
   document.getElementById("mStatus").textContent = r?statusLabel(r):"-";
   const me=state.players[state.uid];
   document.getElementById("mSeat").textContent = me?("席"+(me.seat+1)):"-";
@@ -1294,9 +1358,9 @@ function renderHeader(){
   document.getElementById("minRaise").textContent = r?(r.minRaise||0):0;
   document.getElementById("stageLabel").textContent = r?stageLabel(r.stage)+(r.handNo?` / 第${r.handNo}ハンド`:""):"待機中";
 }
-function variantLabel(v){ return {holdem:"テキサスホールデム",omaha:"オマハ",draw5:"5カードドロー"}[v]||v; }
-function bettingLabel(b){ return {nolimit:"ノーリミット",limit:"リミット",potlimit:"ポットリミット"}[b]||b; }
-function stageLabel(s){ return {waiting:"待機中",preflop:"プリフロップ",flop:"フロップ",turn:"ターン",river:"リバー",showdown:"ショーダウン",ended:"結果表示",predraw:"第1ベット",draw:"ドロー",postdraw:"第2ベット"}[s]||s; }
+function variantLabel(v){ return {holdem:"テキサスホールデム",omaha:"オマハ",draw5:"5カードドロー",stud7:"7カードスタッド"}[v]||v; }
+function bettingLabel(b){ return {nolimit_cash:"ノーリミットHE（キャッシュ）",nolimit_mtt:"ノーリミットHE（トーナメント）",limit:"リミットHE",potlimit:"ポットリミットHE",nolimit:"ノーリミット"}[b]||b; }
+function stageLabel(s){ return {waiting:"待機中",preflop:"プリフロップ",flop:"フロップ",turn:"ターン",river:"リバー",showdown:"ショーダウン",ended:"結果表示",predraw:"第1ベット",draw:"ドロー",postdraw:"第2ベット",stud1:"サードストリート",stud2:"フォースストリート",stud3:"フィフスストリート"}[s]||s; }
 function statusLabel(r){ return {waiting:"待機/結果",playing:"進行中"}[r.status]||r.status; }
 
 function renderBoard(board){
@@ -1333,7 +1397,7 @@ function renderSeats(){
     } else if(showdown){
       cardsHtml = r.publicHands[p.uid].map(c=>cardHtml(c,{small:true})).join("");
     } else if(p.inHand && !p.folded){
-      const num = r?.variant==="omaha"?4:r?.variant==="draw5"?5:2;
+      const num = r?.variant==="omaha"?4 : r?.variant==="draw5"?5 : r?.variant==="stud7"?7 : 2;
       cardsHtml = Array(num).fill(`<div class="card small back"><div class="mid">♠</div></div>`).join("");
     }
     html += `<div class="seat ${isTurn?'active':''} ${p.folded?'folded':''} ${p.allIn?'allin':''}">
@@ -1375,6 +1439,7 @@ function renderMyHand(){
     if(r.variant==="holdem" && (r.board||[]).length>=3) ev = evalBestHand(h, r.board||[], "holdem");
     else if(r.variant==="omaha" && (r.board||[]).length>=3) ev = evalBestHand(h, r.board||[], "omaha");
     else if(r.variant==="draw5" && h.length===5) ev = evalBestHand(h, [], "draw5");
+    else if(r.variant==="stud7" && h.length===7) ev = evalBestHand(h, [], "stud7");
     if(ev){
       badge.classList.remove("hidden");
       badge.textContent = "現在の役: "+HAND_NAMES[ev.rank];
