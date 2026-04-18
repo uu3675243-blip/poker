@@ -94,7 +94,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .card .br{font-size:13px;line-height:1;align-self:flex-end;transform:rotate(180deg)}
 .card .mid{font-size:22px;align-self:center}
 .card.small .mid{font-size:14px}
-.card.sel{outline:3px solid #5aa7ff; transform:translateY(-4px)}
+.card.sel{outline:3px solid #ffb020; transform:translateY(-8px); box-shadow:0 10px 20px rgba(255,176,32,.45);position:relative}
+.card.sel::after{content:"✔ 交換";position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);background:#ffb020;color:#222;font-size:10px;padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap}
 .card.h,.card.d{color:var(--rHearts)}
 .card.c,.card.s{color:var(--rClubs)}
 
@@ -158,39 +159,39 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <div class="segment" id="variantSeg">
         <div class="opt sel" data-val="holdem">
           <div class="ttl">テキサスホールデム</div>
-          <div class="desc">手札2枚＋共通5枚。世界で最も遊ばれる標準ルール。</div>
+          <div class="desc">手札2枚＋共通5枚。全員が共通カードを共有し、計7枚から最良5枚で役を作る世界標準ルール。</div>
         </div>
         <div class="opt" data-val="omaha">
           <div class="ttl">オマハ</div>
-          <div class="desc">手札4枚のうち必ず2枚を使い、共通3枚を合わせて役を作る。</div>
+          <div class="desc">手札4枚のうち「必ず2枚」＋共通5枚のうち3枚を使い、5枚で役を作る。手札が多い分ドローが激しい。</div>
         </div>
         <div class="opt" data-val="draw5">
           <div class="ttl">5カードドロー</div>
-          <div class="desc">手札5枚。1回だけ任意の枚数を交換して役を作る。</div>
+          <div class="desc">手札5枚が配られ、ベット後に1回だけ任意の枚数を交換して役を整えるシンプルな古典ルール。共通カードなし。</div>
         </div>
         <div class="opt" data-val="stud7">
           <div class="ttl">7カードスタッド</div>
-          <div class="desc">7枚（表4枚＋裏3枚）を受け取り、最良の5枚で役を作る。アンティ＋ブリングイン方式、共通カードなし。</div>
+          <div class="desc">共通カードなし。全員がアンティを払って配布される7枚の中から最良5枚で勝負。ブラインドなし。</div>
         </div>
       </div>
 
       <h3 style="margin-top:10px">③ 対戦形式（ベッティング）</h3>
       <div class="segment" id="bettingSeg">
         <div class="opt sel" data-val="nolimit_cash">
-          <div class="ttl">ノーリミットHE（キャッシュ）</div>
-          <div class="desc">ノーリミット・テキサスホールデム キャッシュゲーム。ブラインド固定・上限なし。</div>
+          <div class="ttl">ノーリミット（キャッシュ）</div>
+          <div class="desc">ベット金額に上限なし。いつでも持ちチップ全額をオールイン可能。ブラインドは固定で長く遊べる。★初心者におすすめ。</div>
         </div>
         <div class="opt" data-val="nolimit_mtt">
-          <div class="ttl">ノーリミットHE（トーナメント）</div>
-          <div class="desc">ノーリミット・テキサスホールデム トーナメント。ブラインドが一定ハンドごとに上昇し、落伍者が出る形式。</div>
+          <div class="ttl">ノーリミット（トーナメント）</div>
+          <div class="desc">上限なしは同じだが、5ハンドごとにブラインドが1.5倍に上昇。チップを失った人から順に落伍し、最後の1人が勝者。やや短時間で勝負がつく。</div>
         </div>
         <div class="opt" data-val="limit">
-          <div class="ttl">リミットHE</div>
-          <div class="desc">リミット・テキサスホールデム。ベット額は固定（前半=BB、後半=BB×2）。</div>
+          <div class="ttl">リミット</div>
+          <div class="desc">ベット/レイズ額が「固定」。前半（プリフロップ・フロップ）=BB額、後半（ターン・リバー）=BBの2倍。大敗しにくく数学的な遊び方に向く。</div>
         </div>
         <div class="opt" data-val="potlimit">
-          <div class="ttl">ポットリミットHE</div>
-          <div class="desc">ポットリミット・テキサスホールデム。現在のポット額までベット・レイズ可能。</div>
+          <div class="ttl">ポットリミット</div>
+          <div class="desc">「現在のポット額」がレイズの最大。ポットが小さい間は大しにくせず、局面が進むにつれ高演になる。オマハで主流のルール。</div>
         </div>
       </div>
 
@@ -256,6 +257,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
       </div>
 
       <div class="handArea">
+        <div id="turnBanner" style="display:none;background:linear-gradient(135deg,#1f8e52,#3ed27a);color:#fff;padding:8px 12px;border-radius:10px;font-weight:700;margin-bottom:8px;text-align:center">★ あなたの番です ★</div>
         <h4>あなたの手札 <span id="myHandRank" class="handBadge hidden"></span></h4>
         <div class="handCards" id="myHandEl"></div>
         <div class="actions" id="actionsEl"></div>
@@ -276,18 +278,45 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <div class="log" id="histEl"><div class="l" style="color:#8a94ab">まだ履歴はありません</div></div>
       </div>
       <div id="tabHelp" class="hidden">
-        <div class="log">
-          <div class="l"><b>役の強さ（強い順）</b></div>
-          <div class="l">1. ロイヤルフラッシュ (A-K-Q-J-10 同一スート)</div>
-          <div class="l">2. ストレートフラッシュ</div>
-          <div class="l">3. フォー・オブ・ア・カインド</div>
-          <div class="l">4. フルハウス</div>
-          <div class="l">5. フラッシュ</div>
-          <div class="l">6. ストレート（A-2-3-4-5 も可）</div>
-          <div class="l">7. スリー・オブ・ア・カインド</div>
-          <div class="l">8. ツーペア</div>
-          <div class="l">9. ワンペア</div>
-          <div class="l">10. ハイカード（キッカー比較）</div>
+        <div class="log" style="max-height:520px">
+          <div class="l"><b>■ 役の強さ（強い順）</b></div>
+          <div class="l">1. ロイヤルフラッシュ（A-K-Q-J-10 同スート）</div>
+          <div class="l">2. ストレートフラッシュ（連続5枚が同スート）</div>
+          <div class="l">3. フォー・オブ・ア・カインド（同ランク4枚）</div>
+          <div class="l">4. フルハウス（3枚＋2枚ペア）</div>
+          <div class="l">5. フラッシュ（同スート5枚）</div>
+          <div class="l">6. ストレート（連続5枚、A-2-3-4-5 も可）</div>
+          <div class="l">7. スリー・オブ・ア・カインド（同ランク3枚）</div>
+          <div class="l">8. ツーペア（ペアが2組）</div>
+          <div class="l">9. ワンペア（同ランク2枚）</div>
+          <div class="l">10. ハイカード（上記なし、最大カードで比べる）</div>
+          <div class="l">※ 同役の場合は「キッカー」（次に強いカード）を順に比べて勝負を決めます。</div>
+
+          <div class="l" style="margin-top:8px"><b>■ アクションの意味</b></div>
+          <div class="l"><b>チェック</b>：賭ける必要がない時に「何もしない」で次の人へ。バトンを青く点滅させる操作。</div>
+          <div class="l"><b>コール</b>：直前の賭け金に「乗る」。同じ金額をチップで支払い、次のステージへ進む権利を得る。</div>
+          <div class="l"><b>レイズ / ベット</b>：賭け金を「上げる」。最低額は「現在のベット＋直前のレイズ幅」以上。相手はコールか再レイズ、フォールドを迫られる。</div>
+          <div class="l"><b>フォールド</b>：「このハンドはやめる」。これまでの自分の賭け金は捨てるが、それ以上の損失は回避できる。</div>
+          <div class="l"><b>オールイン</b>：手元のチップを全額賭ける。これ以上は出せないが、勝てば大きい・負ければそのハンドは終了（サイドポットは別計算）。</div>
+
+          <div class="l" style="margin-top:8px"><b>■ テキサスホールデムの流れ</b></div>
+          <div class="l">1. ディーラーの左隣が SB、その左が BB を強制徴収。全員に2枚配られる。</div>
+          <div class="l">2. プリフロップ：BB の左から、コール / レイズ / フォールドを順に選択。</div>
+          <div class="l">3. フロップ：共通カードが3枚開かれる→ベット。</div>
+          <div class="l">4. ターン：共通カードが4枚目→ベット。</div>
+          <div class="l">5. リバー：共通カードが5枚目→最後のベット。</div>
+          <div class="l">6. ショーダウン：手札2枚＋共通5枚の計7枚から最良5枚で役を作り、最も強いプレイヤーがポットを獲得。</div>
+
+          <div class="l" style="margin-top:8px"><b>■ 各種別の注意</b></div>
+          <div class="l"><b>オマハ</b>：手札4枚のうち「必ず2枚」＋共通5枚から33枚を選んで計5枚で役を作る。手札3枚使うは禁止。</div>
+          <div class="l"><b>5カードドロー</b>：初手に5枚配られ、第1ベット→ドロー（1回だけ任意枚数を交換）→第2ベット→ショーダウン。「交換しない」=スタンドパットも可。</div>
+          <div class="l"><b>7カードスタッド</b>：共通カードなし。全員から「アンティ」を徴収し、7枚を配ってから3ラウンドのベット。ショーダウンでは7枚から最良5枚で比べる。</div>
+
+          <div class="l" style="margin-top:8px"><b>■ チップとポット</b></div>
+          <div class="l">各人の持ちチップは「残：○○」で表示。賭けると「ポット」に積まり、ハンドの勝者が全額獲得。オールインが入ると「サイドポット」ができ、出した分だけ勝ち取りに参加する。</div>
+
+          <div class="l" style="margin-top:8px"><b>■ ボタンの使い方</b></div>
+          <div class="l"><b>Min</b>：最小レイズ額を自動入力。<b>Pot</b>：ポット相当額を自動入力。<b>Max</b>：最大額（オールイン相当）を入力。数字欄に直接入力も可。</div>
         </div>
       </div>
     </section>
@@ -974,8 +1003,8 @@ async function advanceBoard(id, curr, players, nextStage){
     const updates={};
     Object.values(players).forEach(p=>{ updates[p.uid]={...p, bet:0, actedThisRound:true, lastAction:""}; });
     await playersRef(id).set(updates);
-    await appendLog(id, `ステージ: ${stageLabel(nextStage)}（${board.slice(-1)[0]||"…"}）`);
-    setTimeout(()=>runToShowdown(id), 500);
+    await appendLog(id, `ステージ: ${stageLabel(nextStage)} — ${board.join(" ")} / 全員オールイン → 残りのカードを自動配布`);
+    setTimeout(()=>runToShowdown(id), 700);
     return;
   }
   const seats = contenders.map(p=>p.seat).sort((a,b)=>a-b);
@@ -992,22 +1021,37 @@ async function advanceBoard(id, curr, players, nextStage){
 
 async function runToShowdown(id){
   const curr=(await roomRef(id).get()).val();
-  const players=(await playersRef(id).get()).val()||{};
-  const board=[...(curr.board||[])];
-  const deck=[...(curr.deck||[])];
-  // 残ステージを一気に
-  let stage=curr.stage;
-  // Stud7 や Draw5 はボード配布なしなので、ここはホールデム/オマハのみ
-  while(stage!=="river" && stage!=="showdown" && curr.variant!=="draw5" && curr.variant!=="stud7"){
-    if(deck.length>0) deck.shift();
-    if(stage==="preflop"){ board.push(deck.shift(),deck.shift(),deck.shift()); stage="flop"; }
-    else if(stage==="flop"){ board.push(deck.shift()); stage="turn"; }
-    else if(stage==="turn"){ board.push(deck.shift()); stage="river"; }
+  if(!curr) return;
+  // Draw5 / Stud7 はボード配布なし→そのままショーダウン
+  if(curr.variant==="draw5" || curr.variant==="stud7"){
+    const p2=(await playersRef(id).get()).val()||{};
+    await showdown(id, curr, p2);
+    return;
   }
-  await roomRef(id).update({deck,board,stage});
-  const c2=(await roomRef(id).get()).val();
-  const p2=(await playersRef(id).get()).val()||{};
-  await showdown(id, c2, p2);
+  // 残りのステージを 1枚ずつ進め・ログ出力・短い間をおく
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  let stage=curr.stage;
+  let deck=[...(curr.deck||[])];
+  let board=[...(curr.board||[])];
+  const steps=[];
+  if(stage==="preflop") steps.push("flop","turn","river");
+  else if(stage==="flop") steps.push("turn","river");
+  else if(stage==="turn") steps.push("river");
+  for(const next of steps){
+    if(deck.length>0) deck.shift(); // バーン
+    if(next==="flop"){
+      const c1=deck.shift(), c2=deck.shift(), c3=deck.shift();
+      board.push(c1,c2,c3);
+    } else {
+      board.push(deck.shift());
+    }
+    await roomRef(id).update({deck, board, stage:next});
+    await appendLog(id, `ステージ: ${stageLabel(next)} — ${board.join(" ")}`);
+    await sleep(600);
+  }
+  const c3=(await roomRef(id).get()).val();
+  const p3=(await playersRef(id).get()).val()||{};
+  await showdown(id, c3, p3);
 }
 
 /* =========================
@@ -1415,25 +1459,34 @@ function renderMyHand(){
   const el=document.getElementById("myHandEl");
   const r=state.room;
   const h=state.myHand||[];
-  const isDraw = r && r.variant==="draw5" && r.stage==="draw" && r.turnSeat===state.players[state.uid]?.seat;
-  const selected = state._drawSel||new Set();
+  const me = state.players[state.uid];
+  const isDraw = r && r.variant==="draw5" && r.stage==="draw" && me && r.turnSeat===me.seat;
+  // ドロー期以外では選択をクリア
+  if(!isDraw) state._drawSel = new Set();
+  if(!state._drawSel) state._drawSel = new Set();
+  const selected = state._drawSel;
+
   el.innerHTML = h.map((c,i)=>cardHtml(c,{selectable:isDraw, selected:selected.has(i), idx:i})).join("") || `<div style="color:#8a94ab">手札なし</div>`;
+
   if(isDraw){
+    // ガイドラベルを追加表示
+    const guide = document.createElement("div");
+    guide.style.cssText = "width:100%;font-size:12px;color:#ffdf9a;margin-top:6px";
+    guide.textContent = `交換したいカードをタップ/クリックして選択（選択中: ${selected.size}枚） → 下の「交換して確定」を押す。交換なしも可。`;
+    el.appendChild(guide);
     el.querySelectorAll(".card[data-idx]").forEach(node=>{
-      node.onclick=()=>{
+      node.style.cursor = "pointer";
+      node.addEventListener("click", (ev)=>{
+        ev.preventDefault(); ev.stopPropagation();
         const idx=parseInt(node.dataset.idx,10);
-        const s=state._drawSel||new Set();
+        const s=state._drawSel;
         if(s.has(idx)) s.delete(idx); else s.add(idx);
-        state._drawSel=s;
         renderMyHand(); renderActions();
-      };
+      });
     });
-  } else {
-    state._drawSel=new Set();
   }
   // 役表示（個人）
   const badge=document.getElementById("myHandRank");
-  const me=state.players[state.uid];
   if(r && me && me.inHand && !me.folded && h.length>0 && (r.variant!=="draw5" || r.stage!=="predraw")){
     let ev=null;
     if(r.variant==="holdem" && (r.board||[]).length>=3) ev = evalBestHand(h, r.board||[], "holdem");
@@ -1452,19 +1505,38 @@ function renderMyHand(){
 }
 function renderActions(){
   const el=document.getElementById("actionsEl");
+  const banner = document.getElementById("turnBanner");
   const r=state.room; const me=state.players[state.uid];
   el.innerHTML="";
+  if(banner) banner.style.display="none";
   if(!r||!me) return;
   if(r.status!=="playing") return;
+  // 「自分の番」バナー
+  if(banner && r.turnSeat===me.seat && !me.folded){
+    banner.style.display="block";
+    if(r.variant==="draw5" && r.stage==="draw"){
+      banner.textContent = "★ あなたのドロー番です — 交換したいカードを選ぶか、交換なしで確定してください";
+    } else {
+      const toCall0 = Math.max(0,(r.currentBet||0)-(me.bet||0));
+      banner.textContent = toCall0>0 ? `★ あなたの番 — コールには ${toCall0} 必要です` : "★ あなたの番 — チェック（見送り）またはベットできます";
+    }
+  }
 
   // 5カードドロー中
   if(r.variant==="draw5" && r.stage==="draw"){
     if(r.turnSeat===me.seat){
       const sel=state._drawSel||new Set();
-      const btn=document.createElement("button"); btn.className="btnPrimary"; btn.textContent=`${sel.size}枚交換して確定`;
-      btn.onclick=()=> apiDraw([...sel]); el.appendChild(btn);
-      const stand=document.createElement("button"); stand.className="btnDark"; stand.textContent="スタンドパット（交換なし）";
-      stand.onclick=()=> apiDraw([]); el.appendChild(stand);
+      const btn=document.createElement("button");
+      btn.className="btnPrimary";
+      btn.style.fontSize="14px";
+      btn.textContent = sel.size>0 ? `✔ ${sel.size}枚交換して確定` : `交換して確定（0枚）：スタンドパット`;
+      btn.onclick=()=>{ apiDraw([...sel]); state._drawSel=new Set(); };
+      el.appendChild(btn);
+      if(sel.size>0){
+        const clr=document.createElement("button"); clr.className="btnDark"; clr.textContent="選択をクリア";
+        clr.onclick=()=>{ state._drawSel=new Set(); renderMyHand(); renderActions(); };
+        el.appendChild(clr);
+      }
     } else {
       el.innerHTML=`<div style="color:#8a94ab">他プレイヤーのドロー待ち…</div>`;
     }
@@ -1477,12 +1549,12 @@ function renderActions(){
   }
   const toCall=Math.max(0,(r.currentBet||0)-(me.bet||0));
   // fold
-  const foldBtn=document.createElement("button"); foldBtn.className="btnDanger"; foldBtn.textContent="フォールド"; foldBtn.onclick=()=>apiAction("fold"); el.appendChild(foldBtn);
+  const foldBtn=document.createElement("button"); foldBtn.className="btnDanger"; foldBtn.textContent="フォールド（彃ける）"; foldBtn.title="このハンドを放棄します。これまでの賭け金は戻りませんが、これ以上の損失は回避できます。"; foldBtn.onclick=()=>apiAction("fold"); el.appendChild(foldBtn);
   if(toCall===0){
-    const chk=document.createElement("button"); chk.className="btnDark"; chk.textContent="チェック"; chk.onclick=()=>apiAction("check"); el.appendChild(chk);
+    const chk=document.createElement("button"); chk.className="btnDark"; chk.textContent="チェック（何もしない）"; chk.title="賭けずに次の人へ回します。ベットが0の時だけ可能。"; chk.onclick=()=>apiAction("check"); el.appendChild(chk);
   } else {
     const callAmt=Math.min(toCall, me.stack);
-    const call=document.createElement("button"); call.className="btnOk"; call.textContent=`コール ${callAmt}`; call.onclick=()=>apiAction("call"); el.appendChild(call);
+    const call=document.createElement("button"); call.className="btnOk"; call.textContent=`コール（${callAmt}支払う）`; call.title="相手の賭け金に乗り、次のステージへ進みます。"; call.onclick=()=>apiAction("call"); el.appendChild(call);
   }
   // raise
   const minTotal = (r.currentBet||0) + (r.minRaise||r.bb);
@@ -1500,12 +1572,14 @@ function renderActions(){
   const maxBtn=document.createElement("button"); maxBtn.textContent="Max"; maxBtn.onclick=()=>inp.value=maxTotal;
   box.appendChild(minBtn); box.appendChild(potBtn); box.appendChild(maxBtn);
   el.appendChild(box);
-  const rs=document.createElement("button"); rs.className="btnPrimary"; rs.textContent = r.currentBet>0?"レイズ":"ベット";
+  const rs=document.createElement("button"); rs.className="btnPrimary"; rs.textContent = r.currentBet>0?"レイズ（上げる）":"ベット（賭ける）";
+  rs.title = r.currentBet>0 ? "賭け金を上げます。最低額以上を入力してください。" : "最初に指定額を賭けます。";
   rs.disabled = maxTotal<minTotal;
   rs.onclick=()=> apiAction("raise", parseInt(inp.value,10));
   el.appendChild(rs);
   // allin
-  const all=document.createElement("button"); all.className="btnWarn"; all.textContent=`オールイン (${me.bet+me.stack})`;
+  const all=document.createElement("button"); all.className="btnWarn"; all.textContent=`オールイン（全額${me.bet+me.stack}）`;
+  all.title = "持ちチップを全て賭けます。";
   all.disabled = me.stack<=0;
   all.onclick=()=>apiAction("allin");
   el.appendChild(all);
@@ -1543,14 +1617,25 @@ function renderButtons(){
 /* =========================
  * ショーダウン結果モーダル
  * ========================= */
-let _lastModalHandNo=-1;
+// モーダル状態管理：ハンドの handNo ごとに「表示済みかつユーザーがOKを押した」を記録
+let _modalShownForHand=-1;     // 表示済みの handNo
+let _modalClosedForHand=-1;    // ユーザーが OK を押した handNo
 function renderModal(){
-  const root=document.getElementById("modalRoot"); root.innerHTML="";
+  const root=document.getElementById("modalRoot");
   const r=state.room;
-  if(!r) return;
-  if(r.stage!=="ended") { _lastModalHandNo=-1; return; }
-  if(_lastModalHandNo===r.handNo) return;
-  _lastModalHandNo=r.handNo;
+  if(!r){ root.innerHTML=""; return; }
+  // 結果表示中でなければ何もしない
+  if(r.stage!=="ended"){
+    // 次のハンドが始まったら消す
+    if(r.status==="playing") root.innerHTML="";
+    return;
+  }
+  // すでにこのハンドで OK を押されていれば表示しない
+  if(_modalClosedForHand === r.handNo) return;
+  // すでに表示中ならDOMを保持して何もしない（変数状態の差分更新を防ぐ）
+  if(_modalShownForHand === r.handNo && root.querySelector(".modal")) return;
+  _modalShownForHand = r.handNo;
+
   const wl=r.winnersLog||[];
   const wlines = wl.map(p=>{
     const names=(p.winners||[]).map(w=>`${escapeHtml(w.name)}（${escapeHtml(w.rankName||"")}）`).join("、");
@@ -1559,15 +1644,21 @@ function renderModal(){
   const hands = (r.publicHands?Object.entries(r.publicHands):[]).map(([uid,h])=>{
     const ev=(r.evals||{})[uid];
     const name=escapeHtml(state.players[uid]?.name||uid);
-    return `<div style="display:flex;align-items:center;gap:6px;margin:6px 0"><b>${name}</b> <span class="handBadge">${escapeHtml(ev?.rankName||"")}</span> ${h.map(c=>cardHtml(c,{small:true})).join("")}</div>`;
+    return `<div style="display:flex;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap"><b>${name}</b> <span class="handBadge">${escapeHtml(ev?.rankName||"")}</span> ${h.map(c=>cardHtml(c,{small:true})).join("")}</div>`;
   }).join("");
+  const boardHtml = (r.board&&r.board.length>0) ?
+    `<div style="margin:8px 0"><div style="font-size:12px;color:#8a94ab;margin-bottom:4px">共通カード</div><div style="display:flex;gap:4px;flex-wrap:wrap">${r.board.map(c=>cardHtml(c,{small:true})).join("")}</div></div>` : "";
   root.innerHTML=`<div class="modal"><div class="box">
     <h2>ハンド結果（第${r.handNo}ハンド）</h2>
     ${wlines||"<div class='winnerLine'>勝者なし</div>"}
-    <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">${hands}</div>
-    <div class="row"><button class="btnPrimary" id="mClose">OK</button></div>
+    ${boardHtml}
+    <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">${hands||'<div style="color:#8a94ab">公開ハンドなし（不戦勝）</div>'}</div>
+    <div class="row"><button class="btnPrimary" id="mClose">OK（結果を閉じる）</button></div>
   </div></div>`;
-  document.getElementById("mClose").onclick=()=>{ root.innerHTML=""; };
+  document.getElementById("mClose").onclick=()=>{
+    _modalClosedForHand = r.handNo;
+    root.innerHTML="";
+  };
 }
 </script>
 </body>
