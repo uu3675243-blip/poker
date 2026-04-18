@@ -1,0 +1,1509 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ポーカー対戦アプリ（Firebase版）</title>
+<style>
+:root{
+  --bg:#0b1220; --panel:#121a2c; --panel2:#0e1627; --line:#1f2a44;
+  --text:#e7ecf6; --muted:#8a94ab; --accent:#5aa7ff; --accent2:#2d6cdf;
+  --ok:#3ed27a; --warn:#ffb020; --danger:#ff5a5f; --gold:#f7c948;
+  --chip:#1a2541; --chipHi:#24345b;
+  --card:#ffffff; --cardBack:linear-gradient(135deg,#2a3a6c,#13204a);
+  --rHearts:#e0345c; --rDiamonds:#e0345c; --rClubs:#1a1a1a; --rSpades:#1a1a1a;
+  --shadow:0 6px 16px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(1100px 600px at 20% -10%,#16325c 0%,transparent 60%),radial-gradient(1200px 700px at 120% 10%,#1e2d55 0%,transparent 60%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",Meiryo,Segoe UI,Roboto,sans-serif;}
+.shell{max-width:1400px;margin:0 auto;padding:14px;}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#1f3a7a,#5aa7ff);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}
+.brand h1{font-size:18px;margin:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--chip);color:var(--text);font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--line)}
+.chip.ok{border-color:#1f6a40;background:#0f2a1b;color:#b9f1cf}
+.chip.warn{border-color:#7a5a12;background:#281e07;color:#ffdf9a}
+
+.grid{display:grid;grid-template-columns: 320px 1fr 340px;gap:12px}
+@media (max-width:1180px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--shadow)}
+.panel h3{margin:4px 0 10px 0;font-size:14px;color:#cfd7ea;letter-spacing:.04em}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.field label{font-size:12px;color:var(--muted)}
+.field input[type=text], .field input[type=number], .field select{
+  background:#0b1328;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;outline:none
+}
+.field input:focus, .field select:focus{border-color:var(--accent)}
+button{cursor:pointer;border:1px solid var(--line);background:#132041;color:var(--text);border-radius:10px;padding:10px 12px;font-size:13px;transition:transform .05s ease, background .2s;}
+button:hover{background:#182a56}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.btnPrimary{background:linear-gradient(135deg,#2d6cdf,#5aa7ff);border-color:#2d6cdf;color:#fff;font-weight:700}
+.btnPrimary:hover{filter:brightness(1.08)}
+.btnDark{background:#0d1530;color:#cfd7ea}
+.btnOk{background:linear-gradient(135deg,#1f8e52,#3ed27a);border-color:#1f8e52;color:#fff;font-weight:700}
+.btnDanger{background:linear-gradient(135deg,#b83840,#ff5a5f);border-color:#b83840;color:#fff;font-weight:700}
+.btnWarn{background:linear-gradient(135deg,#b37811,#ffb020);border-color:#b37811;color:#111;font-weight:700}
+.segment{display:flex;gap:6px;flex-wrap:wrap}
+.segment .opt{
+  flex:1 1 0;min-width:90px;padding:10px;border:1px solid var(--line);background:#0b1328;border-radius:10px;color:#cfd7ea;cursor:pointer;
+  display:flex;flex-direction:column;gap:4px
+}
+.segment .opt.sel{border-color:var(--accent);background:#152649;color:#fff;box-shadow:0 0 0 2px rgba(90,167,255,.2) inset}
+.segment .opt .ttl{font-weight:700;font-size:13px}
+.segment .opt .desc{font-size:11px;color:var(--muted);line-height:1.35}
+
+.meta{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;font-size:12px;color:var(--muted)}
+.meta b{color:var(--text);font-weight:600}
+
+.table{
+  position:relative;margin-top:6px;background:
+    radial-gradient(ellipse at center,#0a4a34 0%, #0a3a2b 45%, #052016 100%);
+  border:10px solid #2a160a; border-radius:260px/160px; padding:24px; min-height:380px;
+  box-shadow: inset 0 0 80px rgba(0,0,0,.55), var(--shadow);
+}
+.table .board{display:flex;gap:8px;justify-content:center;align-items:center;margin:18px 0 10px 0;flex-wrap:wrap}
+.potRow{display:flex;justify-content:center;gap:14px;color:#e7ecf6;font-weight:600;margin-bottom:6px}
+.potRow .pot{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:6px 12px}
+.stageLabel{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:12px;color:#cfe7dc;background:rgba(0,0,0,.4);padding:3px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.1)}
+.seats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.seat{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px;position:relative}
+.seat.active{border-color:var(--gold);box-shadow:0 0 0 2px rgba(247,201,72,.35) inset}
+.seat.folded{opacity:.55;filter:grayscale(.4)}
+.seat.allin{border-color:#ff8a00}
+.seat.empty{opacity:.45;border-style:dashed}
+.seat .name{font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px}
+.seat .stack{font-size:12px;color:#cfe1d7}
+.seat .bet{position:absolute;right:8px;top:8px;background:#0b1628;border:1px solid #35527b;border-radius:999px;padding:2px 8px;font-size:11px;color:#ffd}
+.seat .dealer{position:absolute;left:8px;top:8px;background:#f7c948;color:#222;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+.seat .role{font-size:10px;color:#a4d6b8;margin-left:4px}
+.seat .act{font-size:11px;color:#ffdf9a;margin-top:3px;min-height:14px}
+.seat .mini-hand{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.card{
+  width:54px;height:76px;border-radius:8px;background:var(--card);color:#111;position:relative;
+  box-shadow:var(--shadow); display:flex;flex-direction:column;justify-content:space-between;padding:4px 6px; font-weight:800;
+  border:1px solid #d4d9e4;
+}
+.card.back{background:var(--cardBack);border:1px solid #1a2b55;color:transparent}
+.card.small{width:32px;height:46px;padding:2px 4px;font-size:12px;border-radius:6px}
+.card .tl{font-size:13px;line-height:1}
+.card .br{font-size:13px;line-height:1;align-self:flex-end;transform:rotate(180deg)}
+.card .mid{font-size:22px;align-self:center}
+.card.small .mid{font-size:14px}
+.card.sel{outline:3px solid #5aa7ff; transform:translateY(-4px)}
+.card.h,.card.d{color:var(--rHearts)}
+.card.c,.card.s{color:var(--rClubs)}
+
+.handArea{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:12px}
+.handArea h4{margin:0 0 6px 0;font-size:13px;color:#cfd7ea}
+.handCards{display:flex;gap:8px;flex-wrap:wrap}
+.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.actions .raiseBox{display:flex;gap:6px;align-items:center;background:#0b1328;border:1px solid var(--line);border-radius:10px;padding:4px 8px}
+.actions .raiseBox input{background:transparent;border:0;color:#fff;width:90px;font-size:14px;text-align:right;outline:none}
+.actions .raiseBox .lbl{font-size:11px;color:var(--muted)}
+
+.log{max-height:260px;overflow:auto;font-size:12px;background:#0b1328;border:1px solid var(--line);border-radius:10px;padding:8px}
+.log .l{margin-bottom:4px;color:#cfd7ea}
+.log .l .t{color:#7c8aa8;margin-right:6px;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tabs .tab{padding:6px 10px;border:1px solid var(--line);background:#0b1328;border-radius:8px;cursor:pointer;font-size:12px;color:#cfd7ea}
+.tabs .tab.sel{background:#152649;color:#fff;border-color:var(--accent)}
+.hidden{display:none !important}
+
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0b1628;border:1px solid var(--line);padding:10px 14px;border-radius:10px;color:#fff;box-shadow:var(--shadow);font-size:13px;z-index:99;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+
+.modal{position:fixed;inset:0;background:rgba(3,8,20,.7);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;max-width:520px;width:calc(100% - 24px);box-shadow:var(--shadow)}
+.modal h2{margin:0 0 8px 0;font-size:18px}
+.modal .row{justify-content:flex-end;margin-top:10px}
+.winnerLine{font-size:14px;color:#ffdf9a;margin-bottom:6px}
+.handBadge{display:inline-block;padding:2px 8px;background:#152649;border-radius:999px;border:1px solid var(--line);color:#cfe1ff;font-size:12px;margin-left:6px}
+
+/* Variant info card */
+.info{background:#0b1328;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px;color:#b9c4de;line-height:1.5}
+.kbd{background:#0b1328;border:1px solid var(--line);border-radius:6px;padding:0 6px;font-size:11px;color:#cfd7ea}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">♠</div>
+      <h1>ポーカー対戦アプリ <span class="chip">Firebase版</span></h1>
+    </div>
+    <div class="chips">
+      <span class="chip ok">Realtime Database</span>
+      <span class="chip">匿名認証</span>
+      <span class="chip">自作役判定</span>
+      <span class="chip">サイドポット対応</span>
+      <span id="authChip" class="chip warn">接続中…</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- ===== 左カラム：ルーム作成／参加 ===== -->
+    <section class="panel">
+      <h3>① 参加者設定</h3>
+      <div class="field">
+        <label>表示名（必須・最大16文字）</label>
+        <input id="playerName" type="text" maxlength="16" placeholder="例）プレイヤー1">
+      </div>
+
+      <h3>② ポーカー種別</h3>
+      <div class="segment" id="variantSeg">
+        <div class="opt sel" data-val="holdem">
+          <div class="ttl">テキサスホールデム</div>
+          <div class="desc">手札2枚＋共通5枚。世界で最も遊ばれる標準ルール。</div>
+        </div>
+        <div class="opt" data-val="omaha">
+          <div class="ttl">オマハ</div>
+          <div class="desc">手札4枚のうち必ず2枚を使い、共通3枚を合わせて役を作る。</div>
+        </div>
+        <div class="opt" data-val="draw5">
+          <div class="ttl">5カードドロー</div>
+          <div class="desc">手札5枚。1回だけ任意の枚数を交換して役を作る。</div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:10px">③ 対戦形式（ベッティング）</h3>
+      <div class="segment" id="bettingSeg">
+        <div class="opt sel" data-val="nolimit">
+          <div class="ttl">ノーリミット</div>
+          <div class="desc">賭け金上限なし。いつでもオールイン可能。</div>
+        </div>
+        <div class="opt" data-val="limit">
+          <div class="ttl">リミット</div>
+          <div class="desc">ベット額は固定（前半=SB+BB、後半=BB×2）。</div>
+        </div>
+        <div class="opt" data-val="potlimit">
+          <div class="ttl">ポットリミット</div>
+          <div class="desc">現在のポット額までベット・レイズ可能。</div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:10px">④ ルーム詳細</h3>
+      <div class="field">
+        <label>最大人数（2〜9）</label>
+        <select id="maxPlayers"></select>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1">
+          <label>初期スタック</label>
+          <input id="startingStack" type="number" min="100" step="100" value="1000">
+        </div>
+        <div class="field" style="flex:1">
+          <label>SB / BB</label>
+          <input id="blinds" type="text" value="10/20" placeholder="例）10/20">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>ルームID（参加時に入力・作成時は自動）</label>
+        <input id="roomId" type="text" maxlength="10" placeholder="例）AB12CD">
+      </div>
+
+      <div class="row" style="margin-bottom:8px">
+        <button id="btnCreate" class="btnPrimary">ルーム作成</button>
+        <button id="btnJoin" class="btnDark">ルーム参加</button>
+        <button id="btnCopy" class="btnDark" disabled>IDコピー</button>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <button id="btnStart" class="btnOk" disabled>ゲーム開始</button>
+        <button id="btnReset" class="btnDanger" disabled>ルーム初期化</button>
+        <button id="btnLeave" class="btnDark" disabled>退出</button>
+      </div>
+
+      <div class="meta">
+        <div>ルームID：</div><div><b id="mRoom">-</b></div>
+        <div>種別：</div><div><b id="mVariant">-</b></div>
+        <div>形式：</div><div><b id="mBetting">-</b></div>
+        <div>ブラインド：</div><div><b id="mBlinds">-</b></div>
+        <div>ステータス：</div><div><b id="mStatus">-</b></div>
+        <div>自分の席：</div><div><b id="mSeat">-</b></div>
+      </div>
+
+      <div class="info" style="margin-top:10px">
+        全参加者は匿名認証で自動ログイン。手札は
+        <span class="kbd">privateHands/{roomId}/{uid}</span> に保存され、本人のみが読み取れます。
+      </div>
+    </section>
+
+    <!-- ===== 中央カラム：テーブル／操作 ===== -->
+    <section class="panel">
+      <h3>テーブル</h3>
+      <div class="table" id="tableEl">
+        <div class="stageLabel" id="stageLabel">待機中</div>
+        <div class="potRow">
+          <div class="pot">ポット: <b id="potMain">0</b></div>
+          <div class="pot">現在のベット: <b id="currentBet">0</b></div>
+          <div class="pot">最小レイズ: <b id="minRaise">0</b></div>
+        </div>
+        <div class="board" id="boardEl"></div>
+        <div class="seats" id="seatsEl"></div>
+      </div>
+
+      <div class="handArea">
+        <h4>あなたの手札 <span id="myHandRank" class="handBadge hidden"></span></h4>
+        <div class="handCards" id="myHandEl"></div>
+        <div class="actions" id="actionsEl"></div>
+      </div>
+    </section>
+
+    <!-- ===== 右カラム：ログ／履歴 ===== -->
+    <section class="panel">
+      <div class="tabs">
+        <div class="tab sel" data-tab="log">アクションログ</div>
+        <div class="tab" data-tab="hist">履歴</div>
+        <div class="tab" data-tab="help">役一覧</div>
+      </div>
+      <div id="tabLog">
+        <div class="log" id="logEl"></div>
+      </div>
+      <div id="tabHist" class="hidden">
+        <div class="log" id="histEl"><div class="l" style="color:#8a94ab">まだ履歴はありません</div></div>
+      </div>
+      <div id="tabHelp" class="hidden">
+        <div class="log">
+          <div class="l"><b>役の強さ（強い順）</b></div>
+          <div class="l">1. ロイヤルフラッシュ (A-K-Q-J-10 同一スート)</div>
+          <div class="l">2. ストレートフラッシュ</div>
+          <div class="l">3. フォー・オブ・ア・カインド</div>
+          <div class="l">4. フルハウス</div>
+          <div class="l">5. フラッシュ</div>
+          <div class="l">6. ストレート（A-2-3-4-5 も可）</div>
+          <div class="l">7. スリー・オブ・ア・カインド</div>
+          <div class="l">8. ツーペア</div>
+          <div class="l">9. ワンペア</div>
+          <div class="l">10. ハイカード（キッカー比較）</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<div id="modalRoot"></div>
+
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+/* ========================================================================
+ * Firebase 設定（別プロジェクト用に差し替えてください）
+ * Firebase Console → プロジェクト設定 → マイアプリ(ウェブ) から値を取得
+ * ======================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCuZG7R_12MKUOSWsALk-eEVKcyQdm4lpo",
+  authDomain: "poker-aae8f.firebaseapp.com",
+  databaseURL: "https://poker-aae8f-default-rtdb.firebaseio.com",
+  projectId: "poker-aae8f",
+  storageBucket: "poker-aae8f.firebasestorage.app",
+  messagingSenderId: "716709677662",
+  appId: "1:716709677662:web:2b13f739018f18698702cf"
+};
+firebase.initializeApp(firebaseConfig);
+const fauth = firebase.auth();
+const fdb   = firebase.database();
+
+const STORAGE = { name:"poker.name", roomId:"poker.roomId" };
+const SUITS = ["s","h","d","c"];
+const SUIT_SYM = {s:"♠",h:"♥",d:"♦",c:"♣"};
+const RANKS = ["2","3","4","5","6","7","8","9","T","J","Q","K","A"];
+const RANK_LABEL = {T:"10",J:"J",Q:"Q",K:"K",A:"A"};
+const RANK_VAL = Object.fromEntries(RANKS.map((r,i)=>[r,i+2])); // 2..14
+const HAND_NAMES = ["ハイカード","ワンペア","ツーペア","スリーカード","ストレート","フラッシュ","フルハウス","フォーカード","ストレートフラッシュ","ロイヤルフラッシュ"];
+
+const state = {
+  uid:null,
+  roomId:null,
+  playerName:"",
+  variant:"holdem",
+  betting:"nolimit",
+  room:null,
+  players:{},
+  myHand:[],
+  refs:{ room:null, players:null, hand:null }
+};
+
+/* =========================
+ * 起動・イベント
+ * ========================= */
+document.addEventListener("DOMContentLoaded", init);
+function init(){
+  // 最大人数 select
+  const mp = document.getElementById("maxPlayers");
+  for(let i=2;i<=9;i++){
+    const o=document.createElement("option"); o.value=i; o.textContent=i+"人"; if(i===6)o.selected=true; mp.appendChild(o);
+  }
+  // セグメント
+  bindSegment("variantSeg",(v)=>{ state.variant=v; });
+  bindSegment("bettingSeg",(v)=>{ state.betting=v; });
+
+  // 名前／RoomID 復元
+  document.getElementById("playerName").value = localStorage.getItem(STORAGE.name) || "";
+  const sp=new URLSearchParams(location.search).get("room");
+  if(sp) document.getElementById("roomId").value = sp.toUpperCase();
+
+  // ボタン
+  document.getElementById("btnCreate").onclick = apiCreateRoom;
+  document.getElementById("btnJoin").onclick   = apiJoinRoom;
+  document.getElementById("btnStart").onclick  = apiStartGame;
+  document.getElementById("btnReset").onclick  = apiResetRoom;
+  document.getElementById("btnLeave").onclick  = apiLeaveRoom;
+  document.getElementById("btnCopy").onclick   = copyRoomId;
+
+  // タブ
+  document.querySelectorAll(".tabs .tab").forEach(t=>{
+    t.onclick=()=>{
+      document.querySelectorAll(".tabs .tab").forEach(x=>x.classList.remove("sel"));
+      t.classList.add("sel");
+      ["tabLog","tabHist","tabHelp"].forEach(id=>document.getElementById(id).classList.add("hidden"));
+      document.getElementById("tab"+({log:"Log",hist:"Hist",help:"Help"}[t.dataset.tab])).classList.remove("hidden");
+    };
+  });
+
+  // 匿名ログイン
+  fauth.onAuthStateChanged(user=>{
+    if(user){
+      state.uid=user.uid;
+      const c=document.getElementById("authChip");
+      c.textContent="認証OK";
+      c.classList.remove("warn"); c.classList.add("ok");
+      // 自動で前回の部屋へ再接続
+      const lastRoom=localStorage.getItem(STORAGE.roomId);
+      if(lastRoom && !state.roomId){
+        document.getElementById("roomId").value=lastRoom;
+      }
+    }
+  });
+  fauth.signInAnonymously().catch(err=>{
+    toast("匿名認証に失敗: "+err.message);
+    const c=document.getElementById("authChip"); c.textContent="認証失敗"; c.classList.remove("ok"); c.classList.add("warn");
+  });
+
+  renderBoard([]); renderSeats(); renderMyHand(); renderActions();
+}
+function bindSegment(id,cb){
+  const el=document.getElementById(id);
+  el.querySelectorAll(".opt").forEach(o=>{
+    o.onclick=()=>{
+      el.querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
+      o.classList.add("sel"); cb(o.dataset.val);
+    };
+  });
+}
+
+/* =========================
+ * UI ヘルパー
+ * ========================= */
+function toast(msg){
+  const el=document.getElementById("toast"); el.textContent=msg; el.classList.add("show");
+  clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove("show"),2200);
+}
+function escapeHtml(s){return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+function rankLabel(r){return RANK_LABEL[r]||r;}
+function cardHtml(code, {small=false, selectable=false, selected=false, idx=null}={}){
+  if(!code||code==="??") return `<div class="card ${small?'small':''} back"><div class="mid">♠</div></div>`;
+  const r=code[0], s=code[1];
+  return `<div class="card ${s} ${small?'small':''} ${selected?'sel':''}" ${selectable?`data-idx="${idx}"`:""}>
+    <div class="tl">${rankLabel(r)}${SUIT_SYM[s]}</div>
+    <div class="mid">${SUIT_SYM[s]}</div>
+    <div class="br">${rankLabel(r)}${SUIT_SYM[s]}</div>
+  </div>`;
+}
+
+/* =========================
+ * API（Firebase 層）
+ * ========================= */
+function roomRef(id){ return fdb.ref("rooms/"+id); }
+function playersRef(id){ return fdb.ref("roomPlayers/"+id); }
+function myHandRef(id){ return fdb.ref("privateHands/"+id+"/"+state.uid); }
+function historyRef(id){ return fdb.ref("pokerHistory/"+id); }
+
+function newRoomId(){
+  const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s="";
+  for(let i=0;i<6;i++)s+=c[Math.floor(Math.random()*c.length)];
+  return s;
+}
+function normalizeName(n){ return (n||"").trim().substring(0,16); }
+function parseBlinds(str){
+  const m=(str||"").match(/^(\d+)\s*[\/\-\s]\s*(\d+)$/);
+  if(!m) return {sb:10,bb:20};
+  const sb=parseInt(m[1],10)||10, bb=parseInt(m[2],10)||20;
+  return {sb,bb:Math.max(bb,sb*2)};
+}
+
+async function apiCreateRoom(){
+  if(!state.uid){ toast("認証待ち。数秒後にもう一度お試しください"); return; }
+  const name=normalizeName(document.getElementById("playerName").value);
+  if(!name){ toast("表示名を入力してください"); return; }
+  localStorage.setItem(STORAGE.name,name);
+  const maxP=parseInt(document.getElementById("maxPlayers").value,10);
+  const startingStack=Math.max(100,parseInt(document.getElementById("startingStack").value,10)||1000);
+  const bl=parseBlinds(document.getElementById("blinds").value);
+  const id=newRoomId();
+  const room={
+    id, status:"waiting",
+    variant:state.variant, betting:state.betting,
+    maxPlayers:maxP, startingStack, sb:bl.sb, bb:bl.bb,
+    hostUid:state.uid,
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    handNo:0, stage:"waiting", dealerSeat:0,
+    pot:0, currentBet:0, minRaise:bl.bb,
+    board:[], deck:[], lastAggressorSeat:-1,
+    turnSeat:-1, actionEndSeat:-1,
+    lastAction:"", logs:[],
+    sidePots:[]
+  };
+  await roomRef(id).set(room);
+  await playersRef(id).child(state.uid).set({
+    uid:state.uid, name, seat:0, stack:startingStack, bet:0, totalBet:0,
+    folded:false, allIn:false, lastAction:"", actedThisRound:false, inHand:false, joinedAt:Date.now()
+  });
+  localStorage.setItem(STORAGE.roomId,id);
+  document.getElementById("roomId").value=id;
+  subscribeRoom(id);
+  toast("ルームを作成しました: "+id);
+}
+
+async function apiJoinRoom(){
+  if(!state.uid){ toast("認証待ち"); return; }
+  const name=normalizeName(document.getElementById("playerName").value);
+  if(!name){ toast("表示名を入力してください"); return; }
+  const id=(document.getElementById("roomId").value||"").trim().toUpperCase();
+  if(!id){ toast("ルームIDを入力してください"); return; }
+  localStorage.setItem(STORAGE.name,name);
+
+  const rSnap=await roomRef(id).get();
+  if(!rSnap.exists()){ toast("ルームが見つかりません"); return; }
+  const room=rSnap.val();
+  const pSnap=await playersRef(id).get();
+  const ps=pSnap.val()||{};
+  // 既に参加済みなら再接続
+  if(ps[state.uid]){
+    await playersRef(id).child(state.uid).update({ name });
+  } else {
+    const seats = Object.values(ps).map(p=>p.seat);
+    let seat=-1;
+    for(let i=0;i<room.maxPlayers;i++){ if(!seats.includes(i)){ seat=i; break; } }
+    if(seat===-1){ toast("満席です（観戦としては未対応）"); return; }
+    await playersRef(id).child(state.uid).set({
+      uid:state.uid, name, seat, stack:room.startingStack, bet:0, totalBet:0,
+      folded:false, allIn:false, lastAction:"", actedThisRound:false, inHand:false, joinedAt:Date.now()
+    });
+    await appendLog(id, `${name} が参加（席${seat+1}）`);
+  }
+  localStorage.setItem(STORAGE.roomId,id);
+  subscribeRoom(id);
+  toast("ルームに参加しました");
+}
+
+async function apiLeaveRoom(){
+  if(!state.roomId) return;
+  const id=state.roomId;
+  const me=state.players[state.uid];
+  if(me){
+    await appendLog(id, `${me.name} が退出`);
+    await playersRef(id).child(state.uid).remove();
+    await myHandRef(id).remove();
+  }
+  unsubscribeRoom();
+  localStorage.removeItem(STORAGE.roomId);
+  toast("退出しました");
+}
+
+function subscribeRoom(id){
+  unsubscribeRoom();
+  state.roomId=id;
+  state.refs.room = roomRef(id);
+  state.refs.players = playersRef(id);
+  state.refs.hand = myHandRef(id);
+
+  state.refs.room.on("value", snap=>{
+    state.room = snap.val();
+    renderAll();
+  });
+  state.refs.players.on("value", snap=>{
+    state.players = snap.val()||{};
+    renderAll();
+  });
+  state.refs.hand.on("value", snap=>{
+    state.myHand = snap.val()||[];
+    renderMyHand(); renderActions();
+  });
+  historyRef(id).limitToLast(30).on("value", snap=>{
+    renderHistory(snap.val()||{});
+  });
+}
+function unsubscribeRoom(){
+  if(state.refs.room) state.refs.room.off();
+  if(state.refs.players) state.refs.players.off();
+  if(state.refs.hand) state.refs.hand.off();
+  if(state.roomId) historyRef(state.roomId).off();
+  state.refs={room:null,players:null,hand:null};
+  state.roomId=null; state.room=null; state.players={}; state.myHand=[];
+  renderAll();
+}
+
+function copyRoomId(){
+  if(!state.roomId) return;
+  navigator.clipboard.writeText(state.roomId).then(()=>toast("ルームIDをコピーしました"));
+}
+
+/* =========================
+ * ルーム初期化 / ゲーム開始
+ * ========================= */
+async function apiResetRoom(){
+  const id=state.roomId; if(!id) return;
+  const r=state.room; if(!r) return;
+  if(r.hostUid!==state.uid){ toast("ホストのみリセット可能"); return; }
+  await roomRef(id).update({
+    status:"waiting", stage:"waiting", pot:0, currentBet:0, minRaise:r.bb,
+    board:[], deck:[], turnSeat:-1, actionEndSeat:-1, lastAggressorSeat:-1,
+    lastAction:"", sidePots:[], handNo: r.handNo||0,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  });
+  const ps=state.players;
+  const updates={};
+  Object.values(ps).forEach(p=>{
+    updates[p.uid]={...p, bet:0,totalBet:0,folded:false,allIn:false,lastAction:"",actedThisRound:false,inHand:false,stack:r.startingStack};
+  });
+  await playersRef(id).set(updates);
+  // 手札削除
+  await fdb.ref("privateHands/"+id).remove();
+  await appendLog(id, "ルームを初期化しました");
+}
+
+async function apiStartGame(){
+  const id=state.roomId; if(!id) return;
+  const r=state.room; if(!r) return;
+  if(r.hostUid!==state.uid){ toast("ホストのみ開始可能"); return; }
+  const seated=Object.values(state.players).sort((a,b)=>a.seat-b.seat);
+  const active=seated.filter(p=>p.stack>0);
+  if(active.length<2){ toast("2人以上のスタックが必要です"); return; }
+
+  // ディーラー移動
+  const handNo=(r.handNo||0)+1;
+  let dealerSeat=r.dealerSeat||0;
+  if(handNo>1){
+    // 次の席へ
+    dealerSeat = nextSeatFrom(dealerSeat, active.map(p=>p.seat));
+  } else {
+    dealerSeat = active[0].seat;
+  }
+
+  // デッキ
+  const deck=shuffle(createDeck());
+  // プレイヤー状態リセット
+  const playerUpdates={};
+  active.forEach(p=>{
+    playerUpdates[p.uid]={...p, bet:0,totalBet:0,folded:false,allIn:false,lastAction:"",actedThisRound:false,inHand:true};
+  });
+  // スタック0等は inHand:false
+  seated.forEach(p=>{
+    if(!playerUpdates[p.uid]){
+      playerUpdates[p.uid]={...p, bet:0,totalBet:0,folded:true,allIn:false,lastAction:"",actedThisRound:false,inHand:false};
+    }
+  });
+
+  // ハンド別カード数
+  const perPlayer = r.variant==="holdem"?2 : r.variant==="omaha"?4 : 5;
+  // プライベートハンド（UID別に保存）
+  const privateUpdates={};
+  // ディーラー左隣から配布
+  const order = orderFromSeat(active.map(p=>p.seat), dealerSeat, /*skipDealer=*/true);
+  // order を uid 配列に
+  const seatToUid = {};
+  active.forEach(p=>{ seatToUid[p.seat]=p.uid; });
+  const dealUids = order.map(s=>seatToUid[s]);
+  // 1枚ずつ配る
+  let dealt=0;
+  for(let k=0;k<perPlayer;k++){
+    for(const uid of dealUids){
+      const card=deck.shift(); dealt++;
+      if(!privateUpdates[uid]) privateUpdates[uid]=[];
+      privateUpdates[uid].push(card);
+    }
+  }
+
+  // ブラインド
+  const activeSeats = active.map(p=>p.seat).sort((a,b)=>a-b);
+  let sbSeat, bbSeat, firstActSeat;
+  const isHeadsUp = active.length===2;
+  if(isHeadsUp){
+    // ヘッズアップ: ディーラー=SB, 相手=BB, プリフロップはディーラー（SB）から
+    sbSeat = dealerSeat;
+    bbSeat = nextSeatFrom(dealerSeat, activeSeats);
+    firstActSeat = dealerSeat;
+  } else {
+    sbSeat = nextSeatFrom(dealerSeat, activeSeats);
+    bbSeat = nextSeatFrom(sbSeat, activeSeats);
+    firstActSeat = nextSeatFrom(bbSeat, activeSeats);
+  }
+  // 5カードドローの場合、ブラインド方式で同じく進行。ステージは draw-bet1
+  const stage = r.variant==="draw5" ? "predraw" : "preflop";
+
+  // ブラインド徴収
+  const sbP = playerUpdates[seatToUid[sbSeat]];
+  const bbP = playerUpdates[seatToUid[bbSeat]];
+  const sbAmt = Math.min(r.sb, sbP.stack);
+  const bbAmt = Math.min(r.bb, bbP.stack);
+  sbP.stack -= sbAmt; sbP.bet = sbAmt; sbP.totalBet = sbAmt; sbP.lastAction="SB"; if(sbP.stack===0) sbP.allIn=true;
+  bbP.stack -= bbAmt; bbP.bet = bbAmt; bbP.totalBet = bbAmt; bbP.lastAction="BB"; if(bbP.stack===0) bbP.allIn=true;
+
+  const roomUpdate = {
+    status:"playing", stage, handNo, dealerSeat,
+    pot:0, currentBet:bbAmt, minRaise:r.bb,
+    board:[], deck, lastAggressorSeat:bbSeat,
+    turnSeat:firstActSeat, actionEndSeat:bbSeat,
+    sbSeat, bbSeat,
+    lastAction:"", sidePots:[],
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  };
+
+  // 書き込み（transactionで競合を防ぐ）
+  await roomRef(id).update(roomUpdate);
+  await playersRef(id).set(playerUpdates);
+  // 手札
+  const handsRootRef = fdb.ref("privateHands/"+id);
+  await handsRootRef.remove();
+  for(const uid of Object.keys(privateUpdates)){
+    await fdb.ref("privateHands/"+id+"/"+uid).set(privateUpdates[uid]);
+  }
+  await appendLog(id, `第${handNo}ハンド開始 / Dealer=席${dealerSeat+1} / SB=${sbAmt} / BB=${bbAmt}`);
+}
+
+/* =========================
+ * アクション（check/call/raise/fold/allin）
+ * 5-card draw: ドロー処理も含む
+ * ========================= */
+async function apiAction(kind, amount){
+  const id=state.roomId; if(!id) return;
+  const r=state.room; if(!r) return;
+  if(r.status!=="playing"){ toast("ゲーム進行中ではありません"); return; }
+  const me = state.players[state.uid];
+  if(!me){ toast("プレイヤー情報がありません"); return; }
+  if(r.turnSeat!==me.seat){ toast("自分のターンではありません"); return; }
+
+  const ref = roomRef(id);
+  // アクションは room.deck や stage を書き換えるためトランザクションで
+  await ref.transaction(curr=>{
+    if(!curr) return curr;
+    if(curr.turnSeat!==me.seat) return curr; // 他人が先に打った
+    const players = {...state.players};
+    const p = {...players[state.uid]};
+    const toCall = Math.max(0, (curr.currentBet||0) - (p.bet||0));
+
+    if(kind==="fold"){
+      p.folded=true; p.lastAction="フォールド"; p.actedThisRound=true;
+    } else if(kind==="check"){
+      if(toCall>0) return curr; // 不正
+      p.lastAction="チェック"; p.actedThisRound=true;
+    } else if(kind==="call"){
+      const pay=Math.min(toCall, p.stack);
+      p.stack-=pay; p.bet+=pay; p.totalBet+=pay;
+      if(p.stack===0) p.allIn=true;
+      p.lastAction = pay>0?("コール "+pay):"チェック";
+      p.actedThisRound=true;
+    } else if(kind==="raise"){
+      // amount = 「最終的にこのラウンドでのbet合計額」へレイズ
+      const total = Math.max(0, Math.floor(amount));
+      // 検証
+      const pay = total - p.bet;
+      if(pay<=0) return curr;
+      if(pay > p.stack + 0.0001) return curr;
+      const isAllIn = (pay===p.stack);
+      if(!isAllIn){
+        // レイズ最小幅
+        const minTotal = (curr.currentBet||0) + (curr.minRaise||curr.bb);
+        if(total < minTotal) return curr;
+        // Limit / Pot-Limit 上限確認
+        const maxTotal = computeMaxTotal(curr, p, players);
+        if(maxTotal!==null && total > maxTotal) return curr;
+      }
+      p.stack-=pay; p.bet=total; p.totalBet+=pay;
+      if(p.stack===0) p.allIn=true;
+      const isFirstBet = (curr.currentBet||0)===0;
+      const raiseAmt = total - (curr.currentBet||0);
+      p.lastAction = isFirstBet?("ベット "+total):("レイズ→"+total);
+      p.actedThisRound=true;
+      curr.currentBet = total;
+      if(raiseAmt > (curr.minRaise||0)) curr.minRaise = raiseAmt;
+      curr.lastAggressorSeat = p.seat;
+      // 全員アクション必要に
+      curr.actionEndSeat = prevSeatFromObj(p.seat, players, curr.maxPlayers);
+      Object.values(players).forEach(op=>{ if(op.uid!==p.uid && !op.folded && !op.allIn) op.actedThisRound=false; });
+    } else if(kind==="allin"){
+      const pay=p.stack;
+      if(pay<=0) return curr;
+      const total = p.bet + pay;
+      p.stack=0; p.bet=total; p.totalBet+=pay; p.allIn=true;
+      p.lastAction = "オールイン "+total;
+      p.actedThisRound=true;
+      if(total > (curr.currentBet||0)){
+        const raiseAmt = total - (curr.currentBet||0);
+        curr.currentBet = total;
+        if(raiseAmt >= (curr.minRaise||0)){
+          curr.minRaise = raiseAmt;
+          curr.lastAggressorSeat = p.seat;
+          curr.actionEndSeat = prevSeatFromObj(p.seat, players, curr.maxPlayers);
+          Object.values(players).forEach(op=>{ if(op.uid!==p.uid && !op.folded && !op.allIn) op.actedThisRound=false; });
+        }
+      }
+    } else {
+      return curr;
+    }
+    players[state.uid]=p;
+    curr._pendingPlayers = players; // 便宜
+    curr._pendingAction  = `${p.name}: ${p.lastAction}`;
+    return curr;
+  });
+
+  // transaction内で players は別ツリーなので、ここで書き戻し
+  const snap=await roomRef(id).get(); if(!snap.exists()) return;
+  const curr=snap.val();
+  if(curr._pendingPlayers){
+    await playersRef(id).set(curr._pendingPlayers);
+    await appendLog(id, curr._pendingAction||"");
+    await roomRef(id).update({_pendingPlayers:null,_pendingAction:null});
+  }
+
+  // ラウンド進行を判定
+  await advanceIfNeeded(id);
+}
+
+/* =========================
+ * 5-Card Draw ドロー処理
+ * ========================= */
+async function apiDraw(discardIdxs){
+  const id=state.roomId; if(!id) return;
+  const r=state.room; if(!r) return;
+  if(r.variant!=="draw5") return;
+  if(r.stage!=="draw") { toast("ドロー期ではありません"); return; }
+  const me=state.players[state.uid]; if(!me) return;
+  if(r.turnSeat!==me.seat){ toast("自分の番ではありません"); return; }
+  const hand=[...(state.myHand||[])];
+  const keep=[], disc=[];
+  hand.forEach((c,i)=>{ if(discardIdxs.includes(i)) disc.push(c); else keep.push(c); });
+  // デッキから補充
+  const snap=await roomRef(id).get(); const cr=snap.val();
+  const deck=[...(cr.deck||[])];
+  const newCards=[];
+  for(let i=0;i<disc.length;i++){
+    if(deck.length===0) break;
+    newCards.push(deck.shift());
+  }
+  const newHand=keep.concat(newCards);
+  await myHandRef(id).set(newHand);
+  await roomRef(id).update({ deck, updatedAt:firebase.database.ServerValue.TIMESTAMP });
+  await playersRef(id).child(state.uid).update({ lastAction:`ドロー ${disc.length}枚交換`, actedThisRound:true });
+  await appendLog(id, `${me.name} が ${disc.length} 枚交換`);
+  await advanceDrawIfNeeded(id);
+}
+
+async function advanceDrawIfNeeded(id){
+  const snap=await roomRef(id).get(); const curr=snap.val(); if(!curr) return;
+  const pSnap=await playersRef(id).get(); const players=pSnap.val()||{};
+  const contenders = Object.values(players).filter(p=>p.inHand && !p.folded);
+  const allDrew = contenders.every(p => p.actedThisRound || p.allIn);
+  if(!allDrew){
+    // 次の未ドロー者
+    const seats = contenders.map(p=>p.seat).sort((a,b)=>a-b);
+    let next = nextSeatFrom(curr.turnSeat, seats);
+    await roomRef(id).update({ turnSeat: next });
+    return;
+  }
+  // 全員交換終了 → 第2ベッティング
+  const seats = contenders.map(p=>p.seat).sort((a,b)=>a-b);
+  const first = nextSeatFrom(curr.dealerSeat, seats);
+  const updates={};
+  Object.values(players).forEach(p=>{ updates[p.uid]={...p, actedThisRound:false, lastAction:""}; });
+  await playersRef(id).set(updates);
+  await roomRef(id).update({
+    stage:"postdraw", turnSeat:first, actionEndSeat: prevSeatFromList(first, seats),
+    currentBet:0, minRaise:curr.bb, lastAggressorSeat:-1
+  });
+  await appendLog(id, `ドロー終了 → 第2ベッティング`);
+}
+
+/* =========================
+ * ラウンド進行判定
+ * ========================= */
+async function advanceIfNeeded(id){
+  const snap=await roomRef(id).get(); const curr=snap.val(); if(!curr) return;
+  const pSnap=await playersRef(id).get(); const players=pSnap.val()||{};
+
+  // フォールド勝ち
+  const alive = Object.values(players).filter(p=>p.inHand && !p.folded);
+  if(alive.length===1){
+    await awardUncontested(id, curr, players, alive[0]);
+    return;
+  }
+
+  // 全員アクト済み & ベット揃っている？
+  const contenders = Object.values(players).filter(p=>p.inHand && !p.folded);
+  const allMatched = contenders.every(p => p.allIn || p.bet === (curr.currentBet||0));
+  const allActed   = contenders.every(p => p.actedThisRound || p.allIn);
+
+  if(!(allMatched && allActed)){
+    // 次の行動者へ
+    const seats = contenders.filter(p=>!p.allIn).map(p=>p.seat).sort((a,b)=>a-b);
+    if(seats.length===0){
+      // 全員オールイン→ランアウト
+      await runToShowdown(id, curr, players);
+      return;
+    }
+    let next = nextSeatFrom(curr.turnSeat, seats);
+    await roomRef(id).update({ turnSeat: next });
+    return;
+  }
+
+  // ラウンド終了 → ポット収集 → 次ステージ
+  await collectBetsToPot(id);
+  const refreshed=(await roomRef(id).get()).val();
+  const refreshedP=(await playersRef(id).get()).val()||{};
+
+  // 5カードドローの進行
+  if(refreshed.variant==="draw5"){
+    if(refreshed.stage==="predraw"){
+      // → draw
+      const seats2 = Object.values(refreshedP).filter(p=>p.inHand && !p.folded).map(p=>p.seat).sort((a,b)=>a-b);
+      const first = nextSeatFrom(refreshed.dealerSeat, seats2);
+      const updates={};
+      Object.values(refreshedP).forEach(p=>{ updates[p.uid]={...p, actedThisRound:false, lastAction:"", bet:0}; });
+      await playersRef(id).set(updates);
+      await roomRef(id).update({ stage:"draw", turnSeat:first, currentBet:0, minRaise:refreshed.bb, lastAggressorSeat:-1 });
+      await appendLog(id, "ドロー開始");
+      return;
+    } else if(refreshed.stage==="postdraw"){
+      await showdown(id, refreshed, refreshedP);
+      return;
+    }
+  }
+
+  // ホールデム / オマハ
+  const nextStage = {preflop:"flop", flop:"turn", turn:"river", river:"showdown"}[refreshed.stage];
+  if(nextStage==="showdown"){
+    await showdown(id, refreshed, refreshedP);
+    return;
+  }
+  await advanceBoard(id, refreshed, refreshedP, nextStage);
+}
+
+async function advanceBoard(id, curr, players, nextStage){
+  const deck=[...(curr.deck||[])];
+  const board=[...(curr.board||[])];
+  // バーン
+  if(deck.length>0) deck.shift();
+  if(nextStage==="flop"){
+    board.push(deck.shift(), deck.shift(), deck.shift());
+  } else {
+    board.push(deck.shift());
+  }
+  // 新ラウンド初期化
+  const contenders=Object.values(players).filter(p=>p.inHand && !p.folded);
+  if(contenders.filter(p=>!p.allIn).length <= 1){
+    // あとはショーダウンまでランアウト
+    await roomRef(id).update({ deck, board, stage:nextStage, currentBet:0, minRaise:curr.bb, lastAggressorSeat:-1, turnSeat:-1, actionEndSeat:-1 });
+    const updates={};
+    Object.values(players).forEach(p=>{ updates[p.uid]={...p, bet:0, actedThisRound:true, lastAction:""}; });
+    await playersRef(id).set(updates);
+    await appendLog(id, `ステージ: ${stageLabel(nextStage)}（${board.slice(-1)[0]||"…"}）`);
+    setTimeout(()=>runToShowdown(id), 500);
+    return;
+  }
+  const seats = contenders.map(p=>p.seat).sort((a,b)=>a-b);
+  const first = nextSeatFrom(curr.dealerSeat, seats); // SBから
+  const updates={};
+  Object.values(players).forEach(p=>{ updates[p.uid]={...p, bet:0, actedThisRound:false, lastAction:""}; });
+  await playersRef(id).set(updates);
+  await roomRef(id).update({
+    deck, board, stage:nextStage, currentBet:0, minRaise:curr.bb, lastAggressorSeat:-1,
+    turnSeat: first, actionEndSeat: prevSeatFromList(first, seats)
+  });
+  await appendLog(id, `ステージ: ${stageLabel(nextStage)} — ${board.join(" ")}`);
+}
+
+async function runToShowdown(id){
+  const curr=(await roomRef(id).get()).val();
+  const players=(await playersRef(id).get()).val()||{};
+  const board=[...(curr.board||[])];
+  const deck=[...(curr.deck||[])];
+  // 残ステージを一気に
+  let stage=curr.stage;
+  while(stage!=="river" && stage!=="showdown" && curr.variant!=="draw5"){
+    if(deck.length>0) deck.shift();
+    if(stage==="preflop"){ board.push(deck.shift(),deck.shift(),deck.shift()); stage="flop"; }
+    else if(stage==="flop"){ board.push(deck.shift()); stage="turn"; }
+    else if(stage==="turn"){ board.push(deck.shift()); stage="river"; }
+  }
+  await roomRef(id).update({deck,board,stage});
+  const c2=(await roomRef(id).get()).val();
+  const p2=(await playersRef(id).get()).val()||{};
+  await showdown(id, c2, p2);
+}
+
+/* =========================
+ * ポット収集 / サイドポット
+ * ========================= */
+async function collectBetsToPot(id){
+  const curr=(await roomRef(id).get()).val();
+  const players=(await playersRef(id).get()).val()||{};
+  let pot = curr.pot||0;
+  const updates={};
+  Object.values(players).forEach(p=>{
+    pot += (p.bet||0);
+    updates[p.uid]={...p, bet:0, actedThisRound:false};
+  });
+  await playersRef(id).set(updates);
+  await roomRef(id).update({ pot, currentBet:0, minRaise:curr.bb, lastAggressorSeat:-1 });
+}
+
+function computeSidePots(players){
+  // totalBetが小さい順に層ごとにポット
+  const arr=Object.values(players).filter(p=>p.totalBet>0);
+  if(arr.length===0) return [];
+  const sorted=[...arr].sort((a,b)=>a.totalBet-b.totalBet);
+  const pots=[];
+  let prev=0;
+  const contributed=arr.slice();
+  for(const layer of sorted){
+    const layerAmt = layer.totalBet - prev;
+    if(layerAmt<=0) continue;
+    const eligible=[];
+    let sum=0;
+    arr.forEach(p=>{
+      if(p.totalBet >= layer.totalBet){
+        sum += layerAmt;
+        if(!p.folded) eligible.push(p.uid);
+      } else if(p.totalBet > prev){
+        sum += (p.totalBet - prev);
+      }
+    });
+    if(sum>0) pots.push({amount:sum, eligible});
+    prev=layer.totalBet;
+  }
+  // 同額マージ
+  return pots.filter(p=>p.amount>0);
+}
+
+/* =========================
+ * ショーダウン
+ * ========================= */
+async function showdown(id, curr, players){
+  const board = curr.board||[];
+  // 全員の手札を全員に開示（ショーダウンのみ）するため、roomに公開用オブジェクトを書く
+  const publicHands={};
+  const contenders = Object.values(players).filter(p=>p.inHand && !p.folded);
+  for(const p of contenders){
+    const hSnap=await fdb.ref("privateHands/"+id+"/"+p.uid).get();
+    const h = hSnap.val()||[];
+    publicHands[p.uid]=h;
+  }
+  // 役評価
+  const evals={};
+  Object.keys(publicHands).forEach(uid=>{
+    const h=publicHands[uid];
+    evals[uid] = evalBestHand(h, board, curr.variant);
+  });
+
+  // サイドポット計算
+  const pots = computeSidePots(players);
+  // ベット分はポットに入っていないケースもあるので、メインポット + 現在bet を合算しているか確認
+  // ここでは「collectBetsToPot」が未実行な最終ラウンドを想定し、現在のbetもtotalBetに反映済みのはず
+  // ポット合算額 = sum(pots)
+  const winners = {}; // uid -> win amount
+  const winnersLog = [];
+
+  for(const pot of pots){
+    const elig = pot.eligible.filter(uid=>evals[uid]);
+    if(elig.length===0){
+      // 勝者不在（全員フォールド等）→ 返却処理は既に済んでいる想定。念のため均等返却
+      continue;
+    }
+    let best=null; let bestUids=[];
+    for(const uid of elig){
+      const ev=evals[uid];
+      const cmp = best?compareHand(ev, best):1;
+      if(cmp>0){ best=ev; bestUids=[uid]; }
+      else if(cmp===0){ bestUids.push(uid); }
+    }
+    const share = Math.floor(pot.amount / bestUids.length);
+    const rem = pot.amount - share*bestUids.length;
+    bestUids.forEach((uid,i)=>{
+      const add=share + (i<rem?1:0);
+      winners[uid]=(winners[uid]||0)+add;
+    });
+    winnersLog.push({ amount:pot.amount, winners:bestUids.map(u=>({uid:u, name:players[u].name, rank:evals[u].rank, rankName:HAND_NAMES[evals[u].rank]})) });
+  }
+
+  // ストア
+  const playerUpdates={};
+  Object.values(players).forEach(p=>{
+    const np={...p, bet:0, totalBet:0, actedThisRound:false, lastAction:""};
+    if(winners[p.uid]) np.stack += winners[p.uid];
+    playerUpdates[p.uid]=np;
+  });
+  await playersRef(id).set(playerUpdates);
+
+  // 履歴
+  const histKey = historyRef(id).push().key;
+  await historyRef(id).child(histKey).set({
+    at: Date.now(), handNo: curr.handNo, board,
+    variant: curr.variant, betting: curr.betting,
+    results: Object.keys(evals).map(uid=>({
+      uid, name:players[uid].name, hand: publicHands[uid],
+      rank: evals[uid].rank, rankName: HAND_NAMES[evals[uid].rank],
+      best: evals[uid].best||[]
+    })),
+    pots: winnersLog
+  });
+
+  await roomRef(id).update({
+    status:"waiting", stage:"ended", pot:0, currentBet:0, minRaise:curr.bb,
+    turnSeat:-1, actionEndSeat:-1, lastAction:"",
+    publicHands, evals: Object.fromEntries(Object.entries(evals).map(([u,e])=>[u,{rank:e.rank,rankName:HAND_NAMES[e.rank]}])),
+    winnersLog
+  });
+  await appendLog(id, `ショーダウン完了 — ${winnersLog.map(w=>w.winners.map(x=>x.name+"("+x.rankName+")").join("&")+":"+w.amount).join(" / ")}`);
+
+  // 次ハンドは自動で始めず、ホストが「ゲーム開始」で次ハンドを開始
+}
+
+async function awardUncontested(id, curr, players, winner){
+  // 残ベットも総取り
+  let pot=curr.pot||0;
+  Object.values(players).forEach(p=>{ pot+=(p.bet||0); });
+  const pu={...players};
+  Object.values(pu).forEach(p=>{ pu[p.uid]={...p, bet:0,totalBet:0,actedThisRound:false,lastAction:""}; });
+  pu[winner.uid]={...pu[winner.uid], stack: pu[winner.uid].stack + pot, lastAction:`${pot}獲得`};
+  await playersRef(id).set(pu);
+
+  const histKey = historyRef(id).push().key;
+  await historyRef(id).child(histKey).set({
+    at: Date.now(), handNo: curr.handNo, board:curr.board||[],
+    variant: curr.variant, betting: curr.betting,
+    results:[{uid:winner.uid,name:winner.name,rankName:"（不戦勝）",best:[]}],
+    pots:[{amount:pot, winners:[{uid:winner.uid,name:winner.name,rankName:"（不戦勝）"}]}]
+  });
+  await roomRef(id).update({
+    status:"waiting", stage:"ended", pot:0, currentBet:0, minRaise:curr.bb,
+    turnSeat:-1, actionEndSeat:-1, lastAction:"", publicHands:{}, evals:{}, winnersLog:[{amount:pot,winners:[{uid:winner.uid,name:winner.name,rankName:"（不戦勝）"}]}]
+  });
+  await appendLog(id, `${winner.name} が不戦勝で ${pot} を獲得`);
+}
+
+/* =========================
+ * 座席ユーティリティ
+ * ========================= */
+function nextSeatFrom(fromSeat, seats){
+  if(seats.length===0) return -1;
+  const sorted=[...seats].sort((a,b)=>a-b);
+  for(const s of sorted){ if(s>fromSeat) return s; }
+  return sorted[0];
+}
+function prevSeatFromList(fromSeat, seats){
+  const sorted=[...seats].sort((a,b)=>b-a);
+  for(const s of sorted){ if(s<fromSeat) return s; }
+  return sorted[0];
+}
+function prevSeatFromObj(fromSeat, players, maxP){
+  const seats=Object.values(players).filter(p=>p.inHand && !p.folded && !p.allIn).map(p=>p.seat);
+  return prevSeatFromList(fromSeat, seats);
+}
+function orderFromSeat(seats, fromSeat, skipDealer){
+  const sorted=[...seats].sort((a,b)=>a-b);
+  const res=[];
+  let idx=sorted.findIndex(s=>s>fromSeat);
+  if(idx===-1) idx=0;
+  for(let k=0;k<sorted.length;k++){
+    res.push(sorted[(idx+k)%sorted.length]);
+  }
+  return res;
+}
+
+/* =========================
+ * ベッティング上限計算
+ *  - nolimit: 上限なし (maxTotal=null)
+ *  - limit:  固定サイズ (preflop/flop=bb, turn/river=bb*2)
+ *  - potlimit: 現ポット + 自分のbet + toCall を上限
+ * ========================= */
+function computeMaxTotal(curr, me, players){
+  if(curr.betting==="nolimit") return null;
+  if(curr.betting==="limit"){
+    const isSmallStreet = (curr.stage==="preflop"||curr.stage==="flop"||curr.stage==="predraw");
+    const size = isSmallStreet ? curr.bb : curr.bb*2;
+    // 固定サイズ: total = currentBet + size
+    return (curr.currentBet||0) + size;
+  }
+  if(curr.betting==="potlimit"){
+    const pot = curr.pot||0;
+    const otherBets = Object.values(players).reduce((s,p)=> s+(p.uid===me.uid?0:(p.bet||0)), 0);
+    const toCall = Math.max(0, (curr.currentBet||0) - (me.bet||0));
+    // max raise size = pot + bets already in + call
+    const cap = pot + otherBets + toCall;
+    return (me.bet||0) + toCall + cap;
+  }
+  return null;
+}
+
+/* =========================
+ * 52枚デッキ・シャッフル
+ * ========================= */
+function createDeck(){
+  const d=[];
+  for(const s of SUITS) for(const r of RANKS) d.push(r+s);
+  return d;
+}
+function shuffle(arr){
+  const a=arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+/* =========================
+ * 役判定（5枚・7枚・オマハ）
+ * evalBestHand: variant別に最適5枚を選ぶ
+ * 返り値 {rank:0..9, values:[降順キッカー配列], best:5枚}
+ * ========================= */
+function evalBestHand(hand, board, variant){
+  if(variant==="holdem"){
+    const all=[...hand, ...board];
+    return best5From(all);
+  } else if(variant==="omaha"){
+    // 手札から2枚、ボードから3枚
+    let best=null;
+    const handCombos = kCombinations(hand, 2);
+    const boardCombos = kCombinations(board, 3);
+    for(const hc of handCombos){
+      for(const bc of boardCombos){
+        const five = hc.concat(bc);
+        const ev = evalFive(five);
+        if(!best || compareHand(ev,best)>0) best=ev;
+      }
+    }
+    return best;
+  } else if(variant==="draw5"){
+    return evalFive(hand);
+  }
+}
+function best5From(cards){
+  if(cards.length<5) return {rank:0,values:[],best:cards.slice()};
+  let best=null;
+  const combos=kCombinations(cards,5);
+  for(const c of combos){
+    const ev=evalFive(c);
+    if(!best || compareHand(ev,best)>0) best=ev;
+  }
+  return best;
+}
+function kCombinations(arr,k){
+  const res=[];
+  const rec=(start,chosen)=>{
+    if(chosen.length===k){ res.push(chosen.slice()); return; }
+    for(let i=start;i<arr.length;i++){
+      chosen.push(arr[i]); rec(i+1,chosen); chosen.pop();
+    }
+  };
+  rec(0,[]);
+  return res;
+}
+function evalFive(cards){
+  // cards: ["As","Kd",...]
+  const vals = cards.map(c=>RANK_VAL[c[0]]).sort((a,b)=>b-a);
+  const suits = cards.map(c=>c[1]);
+  const isFlush = suits.every(s=>s===suits[0]);
+  // ストレート（5+高い順）
+  const uniq=[...new Set(vals)];
+  let straightHigh=0;
+  if(uniq.length===5){
+    if(uniq[0]-uniq[4]===4) straightHigh=uniq[0];
+    else if(JSON.stringify(uniq)===JSON.stringify([14,5,4,3,2])) straightHigh=5; // A-2-3-4-5
+  }
+  // カウント
+  const cnt={};
+  vals.forEach(v=>cnt[v]=(cnt[v]||0)+1);
+  const groups=Object.entries(cnt).map(([v,c])=>[parseInt(v),c])
+    .sort((a,b)=> b[1]-a[1] || b[0]-a[0]);
+  const counts=groups.map(g=>g[1]);
+  const gvals=groups.map(g=>g[0]);
+  const cStr=counts.join("");
+
+  if(isFlush && straightHigh===14 && vals[0]===14) return {rank:9, values:[14], best:cards};
+  if(isFlush && straightHigh>0) return {rank:8, values:[straightHigh], best:cards};
+  if(cStr.startsWith("4")) return {rank:7, values:[gvals[0],gvals[1]], best:cards};
+  if(cStr==="32") return {rank:6, values:[gvals[0],gvals[1]], best:cards};
+  if(isFlush) return {rank:5, values:vals, best:cards};
+  if(straightHigh>0) return {rank:4, values:[straightHigh], best:cards};
+  if(cStr.startsWith("3")) return {rank:3, values:[gvals[0],gvals[1],gvals[2]], best:cards};
+  if(cStr==="221") return {rank:2, values:[gvals[0],gvals[1],gvals[2]], best:cards};
+  if(cStr.startsWith("2")) return {rank:1, values:[gvals[0],gvals[1],gvals[2],gvals[3]], best:cards};
+  return {rank:0, values:vals, best:cards};
+}
+function compareHand(a,b){
+  if(a.rank!==b.rank) return a.rank-b.rank;
+  const n=Math.max(a.values.length,b.values.length);
+  for(let i=0;i<n;i++){
+    const av=a.values[i]||0, bv=b.values[i]||0;
+    if(av!==bv) return av-bv;
+  }
+  return 0;
+}
+
+/* =========================
+ * ログ
+ * ========================= */
+async function appendLog(id, text){
+  if(!text) return;
+  const r=await roomRef(id).get();
+  const room=r.val(); if(!room) return;
+  const logs=(room.logs||[]).slice(-199);
+  logs.push({t:Date.now(), m:text});
+  await roomRef(id).update({ logs });
+}
+
+/* =========================
+ * レンダリング
+ * ========================= */
+function renderAll(){
+  renderHeader(); renderBoard(state.room?.board||[]); renderSeats(); renderMyHand(); renderActions();
+  renderLogs(); renderButtons();
+  renderModal();
+}
+function renderHeader(){
+  const r=state.room;
+  document.getElementById("mRoom").textContent = state.roomId||"-";
+  document.getElementById("mVariant").textContent = r?variantLabel(r.variant):"-";
+  document.getElementById("mBetting").textContent = r?bettingLabel(r.betting):"-";
+  document.getElementById("mBlinds").textContent = r?`${r.sb}/${r.bb}`:"-";
+  document.getElementById("mStatus").textContent = r?statusLabel(r):"-";
+  const me=state.players[state.uid];
+  document.getElementById("mSeat").textContent = me?("席"+(me.seat+1)):"-";
+  document.getElementById("potMain").textContent = r?(r.pot||0):0;
+  document.getElementById("currentBet").textContent = r?(r.currentBet||0):0;
+  document.getElementById("minRaise").textContent = r?(r.minRaise||0):0;
+  document.getElementById("stageLabel").textContent = r?stageLabel(r.stage)+(r.handNo?` / 第${r.handNo}ハンド`:""):"待機中";
+}
+function variantLabel(v){ return {holdem:"テキサスホールデム",omaha:"オマハ",draw5:"5カードドロー"}[v]||v; }
+function bettingLabel(b){ return {nolimit:"ノーリミット",limit:"リミット",potlimit:"ポットリミット"}[b]||b; }
+function stageLabel(s){ return {waiting:"待機中",preflop:"プリフロップ",flop:"フロップ",turn:"ターン",river:"リバー",showdown:"ショーダウン",ended:"結果表示",predraw:"第1ベット",draw:"ドロー",postdraw:"第2ベット"}[s]||s; }
+function statusLabel(r){ return {waiting:"待機/結果",playing:"進行中"}[r.status]||r.status; }
+
+function renderBoard(board){
+  const el=document.getElementById("boardEl");
+  if(!board||board.length===0){
+    el.innerHTML=[0,1,2,3,4].map(()=>`<div class="card back"><div class="mid">♠</div></div>`).join("");
+  } else {
+    el.innerHTML = board.map(c=>cardHtml(c)).join("") + Array(Math.max(0,5-board.length)).fill(`<div class="card back"><div class="mid">♠</div></div>`).join("");
+  }
+}
+function renderSeats(){
+  const el=document.getElementById("seatsEl");
+  const r=state.room;
+  const maxP = r?r.maxPlayers:6;
+  const players = Object.values(state.players).sort((a,b)=>a.seat-b.seat);
+  const bySeat={}; players.forEach(p=>bySeat[p.seat]=p);
+  let html="";
+  for(let i=0;i<maxP;i++){
+    const p=bySeat[i];
+    if(!p){
+      html += `<div class="seat empty"><div class="name">席${i+1}</div><div class="stack">空席</div></div>`;
+      continue;
+    }
+    const isTurn = r && r.turnSeat===p.seat;
+    const role = (r && (r.sbSeat===p.seat?"SB":r.bbSeat===p.seat?"BB":""));
+    const dealer = (r && r.dealerSeat===p.seat) ? `<div class="dealer">D</div>` : "";
+    const bet = (p.bet>0) ? `<div class="bet">ベット ${p.bet}</div>` : "";
+    // 自分or ショーダウン時に公開
+    let cardsHtml="";
+    const showdown = r && r.stage==="ended" && r.publicHands && r.publicHands[p.uid];
+    if(p.uid===state.uid){
+      const h=state.myHand||[];
+      cardsHtml = h.map(c=>cardHtml(c,{small:true})).join("");
+    } else if(showdown){
+      cardsHtml = r.publicHands[p.uid].map(c=>cardHtml(c,{small:true})).join("");
+    } else if(p.inHand && !p.folded){
+      const num = r?.variant==="omaha"?4:r?.variant==="draw5"?5:2;
+      cardsHtml = Array(num).fill(`<div class="card small back"><div class="mid">♠</div></div>`).join("");
+    }
+    html += `<div class="seat ${isTurn?'active':''} ${p.folded?'folded':''} ${p.allIn?'allin':''}">
+      ${dealer}
+      <div class="name">${escapeHtml(p.name)} ${p.uid===state.uid?'<span class="chip ok" style="padding:1px 6px;font-size:10px">You</span>':""} ${role?`<span class="role">${role}</span>`:""}</div>
+      <div class="stack">残: ${p.stack}</div>
+      ${bet}
+      <div class="mini-hand">${cardsHtml}</div>
+      <div class="act">${escapeHtml(p.lastAction||"")}</div>
+    </div>`;
+  }
+  el.innerHTML=html;
+}
+function renderMyHand(){
+  const el=document.getElementById("myHandEl");
+  const r=state.room;
+  const h=state.myHand||[];
+  const isDraw = r && r.variant==="draw5" && r.stage==="draw" && r.turnSeat===state.players[state.uid]?.seat;
+  const selected = state._drawSel||new Set();
+  el.innerHTML = h.map((c,i)=>cardHtml(c,{selectable:isDraw, selected:selected.has(i), idx:i})).join("") || `<div style="color:#8a94ab">手札なし</div>`;
+  if(isDraw){
+    el.querySelectorAll(".card[data-idx]").forEach(node=>{
+      node.onclick=()=>{
+        const idx=parseInt(node.dataset.idx,10);
+        const s=state._drawSel||new Set();
+        if(s.has(idx)) s.delete(idx); else s.add(idx);
+        state._drawSel=s;
+        renderMyHand(); renderActions();
+      };
+    });
+  } else {
+    state._drawSel=new Set();
+  }
+  // 役表示（個人）
+  const badge=document.getElementById("myHandRank");
+  const me=state.players[state.uid];
+  if(r && me && me.inHand && !me.folded && h.length>0 && (r.variant!=="draw5" || r.stage!=="predraw")){
+    let ev=null;
+    if(r.variant==="holdem" && (r.board||[]).length>=3) ev = evalBestHand(h, r.board||[], "holdem");
+    else if(r.variant==="omaha" && (r.board||[]).length>=3) ev = evalBestHand(h, r.board||[], "omaha");
+    else if(r.variant==="draw5" && h.length===5) ev = evalBestHand(h, [], "draw5");
+    if(ev){
+      badge.classList.remove("hidden");
+      badge.textContent = "現在の役: "+HAND_NAMES[ev.rank];
+    } else {
+      badge.classList.add("hidden");
+    }
+  } else {
+    badge.classList.add("hidden");
+  }
+}
+function renderActions(){
+  const el=document.getElementById("actionsEl");
+  const r=state.room; const me=state.players[state.uid];
+  el.innerHTML="";
+  if(!r||!me) return;
+  if(r.status!=="playing") return;
+
+  // 5カードドロー中
+  if(r.variant==="draw5" && r.stage==="draw"){
+    if(r.turnSeat===me.seat){
+      const sel=state._drawSel||new Set();
+      const btn=document.createElement("button"); btn.className="btnPrimary"; btn.textContent=`${sel.size}枚交換して確定`;
+      btn.onclick=()=> apiDraw([...sel]); el.appendChild(btn);
+      const stand=document.createElement("button"); stand.className="btnDark"; stand.textContent="スタンドパット（交換なし）";
+      stand.onclick=()=> apiDraw([]); el.appendChild(stand);
+    } else {
+      el.innerHTML=`<div style="color:#8a94ab">他プレイヤーのドロー待ち…</div>`;
+    }
+    return;
+  }
+
+  if(r.turnSeat!==me.seat){
+    el.innerHTML=`<div style="color:#8a94ab">他プレイヤーのアクション待ち…</div>`;
+    return;
+  }
+  const toCall=Math.max(0,(r.currentBet||0)-(me.bet||0));
+  // fold
+  const foldBtn=document.createElement("button"); foldBtn.className="btnDanger"; foldBtn.textContent="フォールド"; foldBtn.onclick=()=>apiAction("fold"); el.appendChild(foldBtn);
+  if(toCall===0){
+    const chk=document.createElement("button"); chk.className="btnDark"; chk.textContent="チェック"; chk.onclick=()=>apiAction("check"); el.appendChild(chk);
+  } else {
+    const callAmt=Math.min(toCall, me.stack);
+    const call=document.createElement("button"); call.className="btnOk"; call.textContent=`コール ${callAmt}`; call.onclick=()=>apiAction("call"); el.appendChild(call);
+  }
+  // raise
+  const minTotal = (r.currentBet||0) + (r.minRaise||r.bb);
+  const maxTotal = (()=>{ const m=computeMaxTotal(r, me, state.players); return m===null ? (me.bet+me.stack) : Math.min(m, me.bet+me.stack); })();
+  const box=document.createElement("div"); box.className="raiseBox";
+  const lbl=document.createElement("span"); lbl.className="lbl"; lbl.textContent=(r.currentBet>0?"レイズ→":"ベット→"); box.appendChild(lbl);
+  const inp=document.createElement("input"); inp.type="number"; inp.step=r.bb; inp.min=minTotal; inp.max=maxTotal; inp.value=Math.min(Math.max(minTotal, Math.floor((minTotal+maxTotal)/2)||minTotal), maxTotal);
+  box.appendChild(inp);
+  const minBtn=document.createElement("button"); minBtn.textContent="Min"; minBtn.onclick=()=>inp.value=minTotal;
+  const potBtn=document.createElement("button"); potBtn.textContent="Pot"; potBtn.onclick=()=>{
+    const pot=(r.pot||0)+Object.values(state.players).reduce((s,p)=>s+(p.bet||0),0);
+    const val=Math.min(maxTotal, Math.max(minTotal, (me.bet||0)+toCall+pot));
+    inp.value=val;
+  };
+  const maxBtn=document.createElement("button"); maxBtn.textContent="Max"; maxBtn.onclick=()=>inp.value=maxTotal;
+  box.appendChild(minBtn); box.appendChild(potBtn); box.appendChild(maxBtn);
+  el.appendChild(box);
+  const rs=document.createElement("button"); rs.className="btnPrimary"; rs.textContent = r.currentBet>0?"レイズ":"ベット";
+  rs.disabled = maxTotal<minTotal;
+  rs.onclick=()=> apiAction("raise", parseInt(inp.value,10));
+  el.appendChild(rs);
+  // allin
+  const all=document.createElement("button"); all.className="btnWarn"; all.textContent=`オールイン (${me.bet+me.stack})`;
+  all.disabled = me.stack<=0;
+  all.onclick=()=>apiAction("allin");
+  el.appendChild(all);
+}
+function renderLogs(){
+  const el=document.getElementById("logEl");
+  const logs=(state.room&&state.room.logs)||[];
+  if(logs.length===0){ el.innerHTML=`<div class="l" style="color:#8a94ab">ログはまだありません</div>`; return; }
+  el.innerHTML = logs.slice(-150).map(l=>`<div class="l"><span class="t">${formatTime(l.t)}</span>${escapeHtml(l.m)}</div>`).join("");
+  el.scrollTop=el.scrollHeight;
+}
+function formatTime(t){
+  const d=new Date(t); const z=n=>String(n).padStart(2,"0");
+  return `${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`;
+}
+function renderHistory(obj){
+  const el=document.getElementById("histEl");
+  const arr=Object.entries(obj).map(([k,v])=>({k,...v})).sort((a,b)=>b.at-a.at);
+  if(arr.length===0){ el.innerHTML=`<div class="l" style="color:#8a94ab">まだ履歴はありません</div>`; return; }
+  el.innerHTML = arr.slice(0,30).map(h=>{
+    const rs=(h.results||[]).map(r=>`${escapeHtml(r.name)}(${escapeHtml(r.rankName||"")})`).join(" / ");
+    const pots=(h.pots||[]).map(p=>`${p.amount}→${(p.winners||[]).map(w=>escapeHtml(w.name)).join("&")}`).join(" , ");
+    return `<div class="l"><span class="t">#${h.handNo||"?"}</span>${rs} ｜ ${pots}</div>`;
+  }).join("");
+}
+function renderButtons(){
+  const me = state.players[state.uid];
+  const r = state.room;
+  document.getElementById("btnCopy").disabled   = !state.roomId;
+  document.getElementById("btnLeave").disabled  = !state.roomId;
+  document.getElementById("btnStart").disabled  = !(state.roomId && r && r.hostUid===state.uid && r.status!=="playing" && Object.values(state.players).filter(p=>p.stack>0).length>=2);
+  document.getElementById("btnReset").disabled  = !(state.roomId && r && r.hostUid===state.uid);
+}
+
+/* =========================
+ * ショーダウン結果モーダル
+ * ========================= */
+let _lastModalHandNo=-1;
+function renderModal(){
+  const root=document.getElementById("modalRoot"); root.innerHTML="";
+  const r=state.room;
+  if(!r) return;
+  if(r.stage!=="ended") { _lastModalHandNo=-1; return; }
+  if(_lastModalHandNo===r.handNo) return;
+  _lastModalHandNo=r.handNo;
+  const wl=r.winnersLog||[];
+  const wlines = wl.map(p=>{
+    const names=(p.winners||[]).map(w=>`${escapeHtml(w.name)}（${escapeHtml(w.rankName||"")}）`).join("、");
+    return `<div class="winnerLine">ポット ${p.amount} → ${names}</div>`;
+  }).join("");
+  const hands = (r.publicHands?Object.entries(r.publicHands):[]).map(([uid,h])=>{
+    const ev=(r.evals||{})[uid];
+    const name=escapeHtml(state.players[uid]?.name||uid);
+    return `<div style="display:flex;align-items:center;gap:6px;margin:6px 0"><b>${name}</b> <span class="handBadge">${escapeHtml(ev?.rankName||"")}</span> ${h.map(c=>cardHtml(c,{small:true})).join("")}</div>`;
+  }).join("");
+  root.innerHTML=`<div class="modal"><div class="box">
+    <h2>ハンド結果（第${r.handNo}ハンド）</h2>
+    ${wlines||"<div class='winnerLine'>勝者なし</div>"}
+    <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">${hands}</div>
+    <div class="row"><button class="btnPrimary" id="mClose">OK</button></div>
+  </div></div>`;
+  document.getElementById("mClose").onclick=()=>{ root.innerHTML=""; };
+}
+</script>
+</body>
+</html>
